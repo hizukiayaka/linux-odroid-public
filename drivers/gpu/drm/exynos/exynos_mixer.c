@@ -1129,6 +1129,7 @@ static int mixer_atomic_check(struct exynos_drm_crtc *crtc,
 
 	/* Check against some specific resolutions. */
 	if ((w == 1024 && h == 768) ||
+		(w == 1366 && h == 768) ||
 		(w == 1280 && h == 1024))
 		return 0;
 
