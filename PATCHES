@@ -2,3 +2,4 @@
 [PATCH v5 0/8] Add support for Exynos SROM Controller driver
 [PATCH v3 0/7] Exynos: MFC driver: reserved memory cleanup and IOMMU support
 [PATCH v6 0/6] hwmon: thermal: Odroid U3: Provide support for Odroid U3 fan
+[PATCH v4 00/20] PM / devfreq: Add generic exynos bus frequency driver and new passive governor
