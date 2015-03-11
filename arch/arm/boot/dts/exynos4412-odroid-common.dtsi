@@ -41,6 +41,10 @@
 		};
 	};
 
+	hsotg@12480000 {
+		extcon = <&usb_extcon>;
+	};
+
 	regulators {
 		compatible = "simple-bus";
 		#address-cells = <1>;
@@ -158,6 +162,13 @@
 			       };
 		       };
 		};
+	};
+
+	usb_extcon: odroid-usbotg {
+		compatible = "extcon-odroid-usbotg";
+		pinctrl-names = "default";
+		gpio-vbus-det = <&gpx1 6 0>;
+		status = "disabled";
 	};
 };
 
@@ -680,6 +691,13 @@
 
 &pd_isp {
 	domain-always-on;
+};
+
+&pinctrl_1 {
+	vbus_det: vbus-det {
+		samsung,pins = "gpx1-6";
+		samsung,pin-pud = <0>;
+	};
 };
 
 &rtc {

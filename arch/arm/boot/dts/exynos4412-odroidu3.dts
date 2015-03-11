@@ -118,6 +118,13 @@
 	vmmc-supply = <&ldo22_reg>;
 };
 
+&pinctrl_1 {
+	otg_id: otg-id {
+		samsung,pins = "gpx3-1";
+		samsung,pin-pud = <3>;
+	};
+};
+
 &sound {
 	simple-audio-card,name = "Odroid-U3";
 	simple-audio-card,widgets =
@@ -136,5 +143,11 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_bus>;
 	cs-gpios = <&gpb 5 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
+&usb_extcon {
+	pinctrl-0 = <&otg_id &vbus_det>;
+	gpio-otg-id = <&gpx3 1 0>;
 	status = "okay";
 };
