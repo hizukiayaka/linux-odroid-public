@@ -319,7 +319,7 @@ static struct g2d_cmdlist_node *g2d_get_cmdlist(struct g2d_data *g2d)
 	struct g2d_cmdlist_node *node;
 
 	mutex_lock(&g2d->cmdlist_mutex);
-	if (list_empty(&g2d->free_cmdlist)) {
+	if (unlikely(list_empty(&g2d->free_cmdlist))) {
 		dev_err(dev, "there is no free cmdlist\n");
 		mutex_unlock(&g2d->cmdlist_mutex);
 		return NULL;
@@ -696,7 +696,7 @@ static int g2d_map_cmdlist_gem(struct g2d_data *g2d,
 		handle = cmdlist->data[reg_pos + 1];
 
 		reg_type = g2d_get_reg_type(offset);
-		if (reg_type == REG_TYPE_NONE) {
+		if (unlikely(reg_type == REG_TYPE_NONE)) {
 			ret = -EFAULT;
 			goto err;
 		}
@@ -712,8 +712,8 @@ static int g2d_map_cmdlist_gem(struct g2d_data *g2d,
 				goto err;
 			}
 
-			if (!g2d_check_buf_desc_is_valid(buf_desc,
-							 reg_type, exynos_gem->size)) {
+			if (unlikely(!g2d_check_buf_desc_is_valid(buf_desc,
+							 reg_type, exynos_gem->size))) {
 				exynos_drm_gem_put(drm_dev, exynos_gem);
 				ret = -EFAULT;
 				goto err;
@@ -724,14 +724,14 @@ static int g2d_map_cmdlist_gem(struct g2d_data *g2d,
 		} else {
 			struct drm_exynos_g2d_userptr g2d_userptr;
 
-			if (copy_from_user(&g2d_userptr, (void __user *)handle,
-				sizeof(struct drm_exynos_g2d_userptr))) {
+			if (unlikely(copy_from_user(&g2d_userptr, (void __user *)handle,
+							sizeof(struct drm_exynos_g2d_userptr)))) {
 				ret = -EFAULT;
 				goto err;
 			}
 
-			if (!g2d_check_buf_desc_is_valid(buf_desc, reg_type,
-							g2d_userptr.size)) {
+			if (unlikely(!g2d_check_buf_desc_is_valid(buf_desc, reg_type,
+							g2d_userptr.size))) {
 				ret = -EFAULT;
 				goto err;
 			}
@@ -800,7 +800,7 @@ static void g2d_dma_start(struct g2d_data *g2d,
 	int ret;
 
 	ret = pm_runtime_get_sync(g2d->dev);
-	if (ret < 0)
+	if (unlikely(ret < 0))
 		return;
 
 	writel_relaxed(node->dma_addr, g2d->regs + G2D_DMA_SFR_BASE_ADDR);
@@ -936,9 +936,10 @@ static int g2d_check_reg_offset(struct device *dev,
 		index = cmdlist->last - 2 * (i + 1);
 
 		reg_offset = cmdlist->data[index] & ~0xfffff000;
-		if (reg_offset < G2D_VALID_START || reg_offset > G2D_VALID_END)
+		if (unlikely(reg_offset < G2D_VALID_START ||
+					reg_offset > G2D_VALID_END))
 			goto err;
-		if (reg_offset % 4)
+		if (unlikely(reg_offset % 4))
 			goto err;
 
 		switch (reg_offset) {
@@ -948,7 +949,7 @@ static int g2d_check_reg_offset(struct device *dev,
 		case G2D_DST_PLANE2_BASE_ADDR:
 		case G2D_PAT_BASE_ADDR:
 		case G2D_MSK_BASE_ADDR:
-			if (!for_addr)
+			if (unlikely(!for_addr))
 				goto err;
 
 			reg_type = g2d_get_reg_type(reg_offset);
@@ -972,7 +973,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			break;
 		case G2D_SRC_COLOR_MODE:
 		case G2D_DST_COLOR_MODE:
-			if (for_addr)
+			if (unlikely(for_addr))
 				goto err;
 
 			reg_type = g2d_get_reg_type(reg_offset);
@@ -984,7 +985,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			break;
 		case G2D_SRC_LEFT_TOP:
 		case G2D_DST_LEFT_TOP:
-			if (for_addr)
+			if (unlikely(for_addr))
 				goto err;
 
 			reg_type = g2d_get_reg_type(reg_offset);
@@ -997,7 +998,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			break;
 		case G2D_SRC_RIGHT_BOTTOM:
 		case G2D_DST_RIGHT_BOTTOM:
-			if (for_addr)
+			if (unlikely(for_addr))
 				goto err;
 
 			reg_type = g2d_get_reg_type(reg_offset);
@@ -1009,7 +1010,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			buf_desc->bottom_y = (value & 0x1fff0000) >> 16;
 			break;
 		default:
-			if (for_addr)
+			if (unlikely(for_addr))
 				goto err;
 			break;
 		}
@@ -1064,26 +1065,26 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
 	int size;
 	int ret;
 
-	if (!g2d_priv)
+	if (unlikely(!g2d_priv))
 		return -ENODEV;
 
 	dev = g2d_priv->dev;
-	if (!dev)
+	if (unlikely(!dev))
 		return -ENODEV;
 
 	g2d = dev_get_drvdata(dev);
-	if (!g2d)
+	if (unlikely(!g2d))
 		return -EFAULT;
 
 	node = g2d_get_cmdlist(g2d);
-	if (!node)
+	if (unlikely(!node))
 		return -ENOMEM;
 
 	node->event = NULL;
 
 	if (req->event_type != G2D_EVENT_NOT) {
 		e = kzalloc(sizeof(*node->event), GFP_KERNEL);
-		if (!e) {
+		if (unlikely(!e)) {
 			ret = -ENOMEM;
 			goto err;
 		}
@@ -1138,7 +1139,7 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
 
 	/* Check size of cmdlist: last 2 is about G2D_BITBLT_START */
 	size = cmdlist->last + req->cmd_nr * 2 + req->cmd_buf_nr * 2 + 2;
-	if (size > G2D_CMDLIST_DATA_NUM) {
+	if (unlikely(size > G2D_CMDLIST_DATA_NUM)) {
 		dev_err(dev, "cmdlist size is too big\n");
 		ret = -EINVAL;
 		goto err_free_event;
@@ -1146,16 +1147,16 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
 
 	cmd = (struct drm_exynos_g2d_cmd *)(unsigned long)req->cmd;
 
-	if (copy_from_user(cmdlist->data + cmdlist->last,
+	if (unlikely(copy_from_user(cmdlist->data + cmdlist->last,
 				(void __user *)cmd,
-				sizeof(*cmd) * req->cmd_nr)) {
+				sizeof(*cmd) * req->cmd_nr))) {
 		ret = -EFAULT;
 		goto err_free_event;
 	}
 	cmdlist->last += req->cmd_nr * 2;
 
 	ret = g2d_check_reg_offset(dev, node, req->cmd_nr, false);
-	if (ret < 0)
+	if (unlikely(ret < 0))
 		goto err_free_event;
 
 	node->buf_info.map_nr = req->cmd_buf_nr;
@@ -1165,20 +1166,20 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
 		cmd_buf = (struct drm_exynos_g2d_cmd *)
 				(unsigned long)req->cmd_buf;
 
-		if (copy_from_user(cmdlist->data + cmdlist->last,
+		if (unlikely(copy_from_user(cmdlist->data + cmdlist->last,
 					(void __user *)cmd_buf,
-					sizeof(*cmd_buf) * req->cmd_buf_nr)) {
+					sizeof(*cmd_buf) * req->cmd_buf_nr))) {
 			ret = -EFAULT;
 			goto err_free_event;
 		}
 		cmdlist->last += req->cmd_buf_nr * 2;
 
 		ret = g2d_check_reg_offset(dev, node, req->cmd_buf_nr, true);
-		if (ret < 0)
+		if (unlikely(ret < 0))
 			goto err_free_event;
 
 		ret = g2d_map_cmdlist_gem(g2d, node, drm_dev, file);
-		if (ret < 0)
+		if (unlikely(ret < 0))
 			goto err_unmap;
 	}
 
@@ -1217,19 +1218,19 @@ int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
 	struct list_head *run_cmdlist;
 	struct list_head *event_list;
 
-	if (!g2d_priv)
+	if (unlikely(!g2d_priv))
 		return -ENODEV;
 
 	dev = g2d_priv->dev;
-	if (!dev)
+	if (unlikely(!dev))
 		return -ENODEV;
 
 	g2d = dev_get_drvdata(dev);
-	if (!g2d)
+	if (unlikely(!g2d))
 		return -EFAULT;
 
 	runqueue_node = kmem_cache_alloc(g2d->runqueue_slab, GFP_KERNEL);
-	if (!runqueue_node) {
+	if (unlikely(!runqueue_node)) {
 		dev_err(dev, "failed to allocate memory\n");
 		return -ENOMEM;
 	}
@@ -1243,7 +1244,7 @@ int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
 	list_splice_init(&g2d_priv->inuse_cmdlist, run_cmdlist);
 	list_splice_init(&g2d_priv->event_list, event_list);
 
-	if (list_empty(run_cmdlist)) {
+	if (unlikely(list_empty(run_cmdlist))) {
 		dev_err(dev, "there is no inuse cmdlist\n");
 		kmem_cache_free(g2d->runqueue_slab, runqueue_node);
 		return -EPERM;
@@ -1516,7 +1517,7 @@ static int g2d_runtime_resume(struct device *dev)
 	int ret;
 
 	ret = clk_prepare_enable(g2d->gate_clk);
-	if (ret < 0)
+	if (unlikely(ret < 0))
 		dev_warn(dev, "failed to enable clock.\n");
 
 	return ret;
