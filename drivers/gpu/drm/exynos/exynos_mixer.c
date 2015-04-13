@@ -80,6 +80,7 @@ enum mixer_flag_bits {
 };
 
 static const uint32_t mixer_formats[] = {
+	DRM_FORMAT_ARGB4444,
 	DRM_FORMAT_XRGB4444,
 	DRM_FORMAT_ARGB4444,
 	DRM_FORMAT_XRGB1555,
