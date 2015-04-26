@@ -81,7 +81,9 @@ enum mixer_flag_bits {
 
 static const uint32_t mixer_formats[] = {
 	DRM_FORMAT_XRGB4444,
+	DRM_FORMAT_ARGB4444,
 	DRM_FORMAT_XRGB1555,
+	DRM_FORMAT_ARGB1555,
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_ARGB8888,
@@ -729,10 +731,12 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
 
 	switch (fb->pixel_format) {
 	case DRM_FORMAT_XRGB4444:
+	case DRM_FORMAT_ARGB4444:
 		fmt = MXR_FORMAT_ARGB4444;
 		break;
 
 	case DRM_FORMAT_XRGB1555:
+	case DRM_FORMAT_ARGB1555:
 		fmt = MXR_FORMAT_ARGB1555;
 		break;
 
