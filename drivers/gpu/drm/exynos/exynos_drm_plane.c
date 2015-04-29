@@ -324,9 +324,7 @@ int exynos_plane_init(struct drm_device *dev,
 	exynos_plane->zpos = config->zpos;
 	exynos_plane->config = config;
 
-	if (config->type == DRM_PLANE_TYPE_OVERLAY)
-		exynos_plane_attach_zpos_property(&exynos_plane->base,
-						  config->zpos);
+	exynos_plane_attach_zpos_property(&exynos_plane->base, config->zpos);
 
 	return 0;
 }
