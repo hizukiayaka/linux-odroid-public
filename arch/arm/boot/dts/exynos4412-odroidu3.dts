@@ -13,6 +13,7 @@
 
 /dts-v1/;
 #include "exynos4412-odroid-common.dtsi"
+#include "exynos4412-prime.dtsi"
 #include <dt-bindings/gpio/gpio.h>
 
 / {
