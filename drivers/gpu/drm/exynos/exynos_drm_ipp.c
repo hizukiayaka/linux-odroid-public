@@ -610,6 +610,7 @@ static void ipp_clean_mem_nodes(struct drm_device *drm_dev,
 		if (ret)
 			DRM_ERROR("failed to put m_node.\n");
 	}
+	c_node->last_buf_id[ops] = -1;
 
 	mutex_unlock(&c_node->mem_lock);
 }
@@ -778,6 +779,8 @@ static int ipp_set_mem_node(struct exynos_drm_ippdrv *ippdrv,
 		DRM_ERROR("not support ops.\n");
 		return -EFAULT;
 	}
+
+	c_node->last_buf_id[m_node->ops_id] = m_node->buf_id;
 
 	/* set address and enable irq */
 	if (ops->set_addr) {
@@ -1546,6 +1549,11 @@ void ipp_sched_event(struct work_struct *work)
 		DRM_ERROR("failed to get command node.\n");
 		return;
 	}
+
+	event_work->buf_id[EXYNOS_DRM_OPS_SRC] =
+				c_node->last_buf_id[EXYNOS_DRM_OPS_SRC];
+	event_work->buf_id[EXYNOS_DRM_OPS_DST] =
+				c_node->last_buf_id[EXYNOS_DRM_OPS_DST];
 
 	/*
 	 * IPP supports command thread, event thread synchronization.
