@@ -97,10 +97,6 @@ struct exynos_drm_plane {
  * @disable_plane: disable hardware specific overlay.
  * @te_handler: trigger to transfer video image at the tearing effect
  *	synchronization signal if there is a page flip request.
- * @clock_enable: optional function enabling/disabling display domain clock,
- *	called from exynos-dp driver before powering up (with
- *	'enable' argument as true) and after powering down (with
- *	'enable' as false).
  */
 struct exynos_drm_crtc;
 struct exynos_drm_crtc_ops {
@@ -120,7 +116,6 @@ struct exynos_drm_crtc_ops {
 	void (*atomic_flush)(struct exynos_drm_crtc *crtc,
 			      struct exynos_drm_plane *plane);
 	void (*te_handler)(struct exynos_drm_crtc *crtc);
-	void (*clock_enable)(struct exynos_drm_crtc *crtc, bool enable);
 };
 
 /*
