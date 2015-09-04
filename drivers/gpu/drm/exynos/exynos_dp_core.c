@@ -1289,10 +1289,6 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
 
 	INIT_WORK(&dp->hotplug_work, exynos_dp_hotplug);
 
-	phy_power_on(dp->phy);
-
-	exynos_dp_init_dp(dp);
-
 	ret = devm_request_irq(&pdev->dev, dp->irq, exynos_dp_irq_handler,
 			irq_flags, "exynos-dp", dp);
 	if (ret) {
