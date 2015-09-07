@@ -1,0 +1,71 @@
+<refentry id="cec-ioc-claim">
+  <refmeta>
+    <refentrytitle>ioctl CEC_CLAIM, CEC_RELEASE</refentrytitle>
+    &manvol;
+  </refmeta>
+
+  <refnamediv>
+    <refname>CEC_CLAIM</refname>
+    <refname>CEC_RELEASE</refname>
+    <refpurpose>Claim or release exclusive CEC adapter access</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <funcsynopsis>
+      <funcprototype>
+	<funcdef>int <function>ioctl</function></funcdef>
+	<paramdef>int <parameter>fd</parameter></paramdef>
+	<paramdef>int <parameter>request</parameter></paramdef>
+	<paramdef>__u32 *<parameter>argp</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Arguments</title>
+
+    <variablelist>
+      <varlistentry>
+	<term><parameter>fd</parameter></term>
+	<listitem>
+	  <para>File descriptor returned by
+	  <link linkend='cec-func-open'><function>open()</function></link>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><parameter>request</parameter></term>
+	<listitem>
+	  <para>CEC_CLAIM, CEC_RELEASE</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><parameter>argp</parameter></term>
+	<listitem>
+	  <para></para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1>
+    <title>Description</title>
+
+    <para>To claim exclusive access to a CEC adapter (&ie;, ensuring that no other
+    application can transmit CEC messages) the application must call the
+    <constant>CEC_CLAIM</constant> ioctl. The argument is used to enable or disable
+    the passthrough mode. If <constant>CEC_PASSTHROUGH_DISABLED</constant> is used,
+    then the kernel will take care of the CEC core messages and userspace does not
+    need to process them. If <constant>CEC_PASSTHROUGH_ENABLED</constant> is used,
+    then all messages have to be processed by the application. Exceptions are the
+    Audio Return Channel messages and the CDC Hotplug Detect messages, those are
+    always handled by the kernel if respectively the <constant>CEC_CAP_ARC</constant>
+    or the <constant>CEC_CAP_CDC_HPD</constant> capabilities are set.</para>
+
+    <para>To release exclusive access to a CEC adapter the application must call the
+    <constant>CEC_RELEASE</constant> ioctl.</para>
+  </refsect1>
+
+  <refsect1>
+    &return-value;
+  </refsect1>
+</refentry>
