@@ -1,0 +1,208 @@
+<refentry id="cec-ioc-g-event">
+  <refmeta>
+    <refentrytitle>ioctl CEC_DQEVENT</refentrytitle>
+    &manvol;
+  </refmeta>
+
+  <refnamediv>
+    <refname>CEC_DQEVENT</refname>
+    <refpurpose>Dequeue a CEC event</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <funcsynopsis>
+      <funcprototype>
+	<funcdef>int <function>ioctl</function></funcdef>
+	<paramdef>int <parameter>fd</parameter></paramdef>
+	<paramdef>int <parameter>request</parameter></paramdef>
+	<paramdef>struct cec_event *<parameter>argp</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Arguments</title>
+
+    <variablelist>
+      <varlistentry>
+	<term><parameter>fd</parameter></term>
+	<listitem>
+	  <para>File descriptor returned by
+	  <link linkend='cec-func-open'><function>open()</function></link>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><parameter>request</parameter></term>
+	<listitem>
+	  <para>CEC_DQEVENT</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><parameter>argp</parameter></term>
+	<listitem>
+	  <para></para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1>
+    <title>Description</title>
+
+    <para>CEC devices can send asynchronous events. These can be retrieved by calling
+    the <constant>CEC_DQEVENT</constant> ioctl. If the file descriptor is in non-blocking
+    mode and no event is pending, then it will return -1 and set errno to the &EAGAIN;.</para>
+
+    <para>There can be up to 40 events queued up. If more events are added, then the oldest event
+will be discarded.</para>
+
+    <table pgwide="1" frame="none" id="cec-event-state-change">
+      <title>struct <structname>cec_event_state_change</structname></title>
+      <tgroup cols="3">
+	&cs-str;
+	<tbody valign="top">
+	  <row>
+	    <entry>__u8</entry>
+	    <entry><structfield>state</structfield></entry>
+	    <entry>The state of the CEC adapter, see <xref linkend="cec-event-states" />.</entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </table>
+
+    <table pgwide="1" frame="none" id="cec-event-inputs-change">
+      <title>struct <structname>cec_event_inputs_change</structname></title>
+      <tgroup cols="3">
+	&cs-str;
+	<tbody valign="top">
+	  <row>
+	    <entry>__u16</entry>
+	    <entry><structfield>connected_inputs</structfield></entry>
+	    <entry>A bitmask that reports which inputs are connected.
+	    If bit X is 1, then HDMI input X is connected. Only the first
+	    <structfield>ninputs</structfield> bits (see &CEC-ADAP-G-CAPS;)
+	    are used, the remaining bits are always 0.</entry>
+	  </row>
+	  <row>
+	    <entry>__u16</entry>
+	    <entry><structfield>changed_inputs</structfield></entry>
+	    <entry>A bitmask that reports which inputs changed since the last
+	    <constant>CEC_EVENT_INPUTS_CHANGE</constant> event.
+	    If bit X is 1, then the connection state of HDMI input X changed.
+	    This information is necessary since due to pin bouncing by the
+	    time this event is dequeued the connection state might be unchanged
+	    compared to the last read state, but in reality it went through a
+	    full disconnect-connect cycle.
+	    Only the first <structfield>ninputs</structfield> bits (see
+	     &CEC-ADAP-G-CAPS;) are used, the remaining bits are always 0.</entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </table>
+
+    <table pgwide="1" frame="none" id="cec-event">
+      <title>struct <structname>cec_event</structname></title>
+      <tgroup cols="4">
+	&cs-str;
+	<tbody valign="top">
+	  <row>
+	    <entry>__u64</entry>
+	    <entry><structfield>ts</structfield></entry>
+	    <entry>Timestamp of the event in ns.</entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry>__u32</entry>
+	    <entry><structfield>event</structfield></entry>
+	    <entry>The event, see <xref linkend="cec-events" />.</entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry>__u32</entry>
+	    <entry><structfield>reserved</structfield>[7]</entry>
+	    <entry>Reserved for future extensions. Drivers must
+	    set this array to zero.</entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry>union</entry>
+	    <entry>(anonymous)</entry>
+	    <entry></entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry></entry>
+	    <entry>struct cec_event_state_change</entry>
+	    <entry><structfield>state_change</structfield></entry>
+	    <entry>This event is raised when the adapter state changes.</entry>
+	  </row>
+	  <row>
+	    <entry></entry>
+	    <entry>struct cec_event_inputs_change</entry>
+	    <entry><structfield>inputs_change</structfield></entry>
+	    <entry>This event is raised when the connection state of the HDMI inputs changes.</entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </table>
+
+    <table pgwide="1" frame="none" id="cec-event-states">
+      <title>CEC Adapter States</title>
+      <tgroup cols="3">
+	&cs-def;
+	<tbody valign="top">
+	  <row>
+	    <entry><constant>CEC_EVENT_STATE_DISABLED</constant></entry>
+	    <entry>0</entry>
+	    <entry>The CEC adapter is disabled.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_EVENT_STATE_UNCONFIGURED</constant></entry>
+	    <entry>1</entry>
+	    <entry>The CEC adapter is enabled, but is unconfigured.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_EVENT_STATE_CONFIGURING</constant></entry>
+	    <entry>2</entry>
+	    <entry>The CEC adapter is configuring.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_EVENT_STATE_CONFIGURED</constant></entry>
+	    <entry>3</entry>
+	    <entry>The CEC adapter is configured.</entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </table>
+
+    <table pgwide="1" frame="none" id="cec-events">
+      <title>CEC Events</title>
+      <tgroup cols="3">
+	&cs-def;
+	<tbody valign="top">
+	  <row>
+	    <entry><constant>CEC_EVENT_STATE_CHANGE</constant></entry>
+	    <entry>1</entry>
+	    <entry>Generated when the CEC Adapter's state changes.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_EVENT_INPUTS_CHANGE</constant></entry>
+	    <entry>2</entry>
+	    <entry>Generated when the connection state of one or more of the HDMI
+	    inputs changes.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_EVENT_LOST_MSGS</constant></entry>
+	    <entry>3</entry>
+	    <entry>Generated if one or more CEC messages were lost because the
+	    application didn't dequeue CEC messages fast enough.</entry>
+	  </row>
+	</tbody>
+      </tgroup>
+    </table>
+  </refsect1>
+
+  <refsect1>
+    &return-value;
+  </refsect1>
+</refentry>
