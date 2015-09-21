@@ -38,21 +38,21 @@
 			#cooling-cells = <2>; /* min followed by max */
 		};
 
-		cpu@A01 {
+		cpu1: cpu@A01 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a9";
 			reg = <0xA01>;
 			operating-points-v2 = <&cpu0_opp_table>;
 		};
 
-		cpu@A02 {
+		cpu2: cpu@A02 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a9";
 			reg = <0xA02>;
 			operating-points-v2 = <&cpu0_opp_table>;
 		};
 
-		cpu@A03 {
+		cpu3: cpu@A03 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a9";
 			reg = <0xA03>;
