@@ -987,4 +987,12 @@
 		clocks = <&clock CLK_SSS>;
 		clock-names = "secss";
 	};
+
+	prng: rng@10830400 {
+		compatible = "samsung,exynos4-rng";
+		reg = <0x10830400 0x200>;
+		clocks = <&clock CLK_SSS>;
+		clock-names = "secss";
+		status = "disabled";
+	};
 };
