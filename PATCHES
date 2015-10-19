@@ -6,3 +6,4 @@
 [PATCH v2 0/7] drm/exynos: add pm runtime support
 [PATCH 00/25] Exynos DRM: new life of IPP (Image Post Processing) subsystem
 [PATCH 0/3] ARM: dts: Enable Exynos RNG module
+[PATCH v2 0/6] Switch to generic syscon regmap based drivers
