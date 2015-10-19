@@ -1243,6 +1243,10 @@
 	status = "okay";
 };
 
+&prng {
+	status = "okay";
+};
+
 &rtc {
 	status = "okay";
 	clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
