@@ -5,3 +5,4 @@
 [PATCH v4 00/20] PM / devfreq: Add generic exynos bus frequency driver and new passive governor
 [PATCH v2 0/7] drm/exynos: add pm runtime support
 [PATCH 00/25] Exynos DRM: new life of IPP (Image Post Processing) subsystem
+[PATCH 0/3] ARM: dts: Enable Exynos RNG module
