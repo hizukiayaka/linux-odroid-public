@@ -33,6 +33,8 @@ menuconfig ARCH_EXYNOS
 	select POWER_RESET
 	select POWER_RESET_SYSCON
 	select POWER_RESET_SYSCON_POWEROFF
+	select SOC_SAMSUNG
+	select EXYNOS_SROM if PM
 	help
 	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
 
