@@ -24,6 +24,8 @@
 
 #define DEFAULT_WIN	0
 
+#define EXYNOS_DRM_PITCH_ALIGN	8
+
 #define EXYNOS_BAD_PIXEL_FORMAT 0xffffffffu
 
 #define to_exynos_crtc(x)	container_of(x, struct exynos_drm_crtc, base)
