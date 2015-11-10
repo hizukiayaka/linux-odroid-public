@@ -43,7 +43,6 @@
 
 #define MIXER_WIN_NR		3
 #define VP_DEFAULT_WIN		2
-#define CURSOR_WIN		1
 
 /* The pixelformats that are natively supported by the mixer. */
 #define MXR_FORMAT_RGB565	4
@@ -148,6 +147,31 @@ static const struct layer_cfg vp_default_cfg[] = {
 	{ .index = 2, .priority = 1 },		/* video layer */
 	{ .index = 0, .priority = 2 },		/* layer0 */
 	{ .index = 1, .priority = 3 },		/* layer1 */
+};
+
+static const struct exynos_drm_plane_config plane_configs[MIXER_WIN_NR] = {
+	{
+		.zpos = 0,
+		.type = DRM_PLANE_TYPE_PRIMARY,
+		.pixel_formats = mixer_formats,
+		.num_pixel_formats = ARRAY_SIZE(mixer_formats),
+		.capabilities = EXYNOS_DRM_PLANE_CAP_DOUBLE_X |
+				EXYNOS_DRM_PLANE_CAP_DOUBLE_Y,
+	}, {
+		.zpos = 1,
+		.type = DRM_PLANE_TYPE_CURSOR,
+		.pixel_formats = mixer_formats,
+		.num_pixel_formats = ARRAY_SIZE(mixer_formats),
+		.capabilities = EXYNOS_DRM_PLANE_CAP_DOUBLE_X |
+				EXYNOS_DRM_PLANE_CAP_DOUBLE_Y,
+	}, {
+		.zpos = 2,
+		.type = DRM_PLANE_TYPE_OVERLAY,
+		.pixel_formats = vp_formats,
+		.num_pixel_formats = ARRAY_SIZE(vp_formats),
+		.capabilities = EXYNOS_DRM_PLANE_CAP_DOUBLE_X |
+				EXYNOS_DRM_PLANE_CAP_DOUBLE_Y,
+	},
 };
 
 static const u8 filter_y_horiz_tap8[] = {
@@ -1309,38 +1333,25 @@ static struct of_device_id mixer_match_types[] = {
 };
 MODULE_DEVICE_TABLE(of, mixer_match_types);
 
+
 static int mixer_bind(struct device *dev, struct device *manager, void *data)
 {
 	struct mixer_context *ctx = dev_get_drvdata(dev);
 	struct drm_device *drm_dev = data;
 	struct exynos_drm_plane *exynos_plane;
-	unsigned int zpos;
+	unsigned int i;
 	int ret;
 
 	ret = mixer_initialize(ctx, drm_dev);
 	if (ret)
 		return ret;
 
-	for (zpos = 0; zpos < MIXER_WIN_NR; zpos++) {
-		enum drm_plane_type type;
-		const uint32_t *formats;
-		unsigned int fcount;
-
-		if (zpos == VP_DEFAULT_WIN && !ctx->vp_enabled)
+	for (i = 0; i < MIXER_WIN_NR; i++) {
+		if (i == VP_DEFAULT_WIN && !ctx->vp_enabled)
 			continue;
 
-		if (zpos < VP_DEFAULT_WIN) {
-			formats = mixer_formats;
-			fcount = ARRAY_SIZE(mixer_formats);
-		} else {
-			formats = vp_formats;
-			fcount = ARRAY_SIZE(vp_formats);
-		}
-
-		type = exynos_plane_get_type(zpos, CURSOR_WIN);
-		ret = exynos_plane_init(drm_dev, &ctx->planes[zpos],
-					1 << ctx->pipe, type, formats, fcount,
-					zpos);
+		ret = exynos_plane_init(drm_dev, &ctx->planes[i],
+					1 << ctx->pipe, &plane_configs[i]);
 		if (ret)
 			return ret;
 	}
