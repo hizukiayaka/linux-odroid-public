@@ -488,10 +488,9 @@ static int ipp_validate_mem_node(struct drm_device *drm_dev,
 		plane_size = width * height * bpp;
 		img_size += plane_size;
 
-		if (m_node->buf_info.handles[i]) {
-			size = exynos_drm_gem_get_size(drm_dev,
-					m_node->buf_info.handles[i],
-					c_node->filp);
+		if (m_node->buf_info.obj[i]) {
+			size = m_node->buf_info.obj[i]->size;
+
 			if (plane_size > size) {
 				DRM_ERROR(
 					"buffer %d is smaller than required\n",
@@ -529,10 +528,9 @@ static int ipp_put_mem_node(struct drm_device *drm_dev,
 
 	/* put gem buffer */
 	for_each_ipp_planar(i) {
-		unsigned long handle = m_node->buf_info.handles[i];
-		if (handle)
-			exynos_drm_gem_put_dma_addr(drm_dev, handle,
-							c_node->filp);
+		struct exynos_drm_gem *obj = m_node->buf_info.obj[i];
+		if (obj)
+			exynos_drm_gem_put(drm_dev, obj);
 	}
 
 	list_del(&m_node->list);
@@ -570,30 +568,23 @@ static struct drm_exynos_ipp_mem_node
 
 		/* get dma address by handle */
 		if (qbuf->handle[i]) {
-			dma_addr_t *addr;
-			unsigned long size;
+			struct exynos_drm_gem *exynos_gem;
 
-			addr = exynos_drm_gem_get_dma_addr(drm_dev,
-					qbuf->handle[i], c_node->filp);
-			if (IS_ERR(addr)) {
-				DRM_ERROR("failed to get addr.\n");
+			exynos_gem = exynos_drm_gem_get(drm_dev,
+						qbuf->handle[i], c_node->filp);
+
+			if (IS_ERR(exynos_gem)) {
+				DRM_ERROR("failed to get gem.\n");
 				ipp_put_mem_node(drm_dev, c_node, m_node);
 				return ERR_PTR(-EFAULT);
 			}
 
-			size = exynos_drm_gem_get_size(drm_dev,
-					qbuf->handle[i], c_node->filp);
-			if (!size) {
-				DRM_ERROR("failed to get size.\n");
-				ipp_put_mem_node(drm_dev, c_node, m_node);
-				return ERR_PTR(-EFAULT);
-			}
-
-			buf_info->handles[i] = qbuf->handle[i];
-			buf_info->base[i] = *addr;
-			buf_info->size[i] = (uint64_t)size;
+			buf_info->obj[i] = exynos_gem;
+			buf_info->base[i] = exynos_gem->dma_addr;
+			buf_info->size[i] = exynos_gem->size;
 			DRM_DEBUG_KMS("i[%d]base[%pad]hd[0x%lx]sz[%llx]\n", i,
-				      &buf_info->base[i], buf_info->handles[i],
+				      &buf_info->base[i],
+				      (long unsigned)qbuf->handle[i],
 				      buf_info->size[i]);
 		}
 	}
