@@ -717,7 +717,7 @@ static void fimd_update_plane(struct exynos_drm_crtc *crtc,
 	struct exynos_drm_plane_state *state =
 				to_exynos_plane_state(plane->base.state);
 	struct fimd_context *ctx = crtc->ctx;
-	struct drm_framebuffer *fb = state->base.fb;
+	struct drm_framebuffer *fb = state->fb;
 	dma_addr_t dma_addr;
 	unsigned long val, size, offset;
 	unsigned int last_x, last_y, buf_offsize, line_size;

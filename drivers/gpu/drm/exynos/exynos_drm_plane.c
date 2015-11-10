@@ -119,6 +119,8 @@ static void exynos_plane_mode_set(struct exynos_drm_plane_state *exynos_state)
 	exynos_state->crtc.w = actual_w;
 	exynos_state->crtc.h = actual_h;
 
+	exynos_state->fb = state->fb;
+
 	DRM_DEBUG_KMS("plane : offset_x/y(%d,%d), width/height(%d,%d)",
 			exynos_state->crtc.x, exynos_state->crtc.y,
 			exynos_state->crtc.w, exynos_state->crtc.h);
