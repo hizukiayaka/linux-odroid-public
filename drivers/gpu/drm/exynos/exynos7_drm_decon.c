@@ -401,7 +401,7 @@ static void decon_update_plane(struct exynos_drm_crtc *crtc,
 	struct exynos_drm_plane_state *state =
 				to_exynos_plane_state(plane->base.state);
 	struct decon_context *ctx = crtc->ctx;
-	struct drm_framebuffer *fb = state->base.fb;
+	struct drm_framebuffer *fb = state->fb;
 	int padding;
 	unsigned long val, alpha;
 	unsigned int last_x;

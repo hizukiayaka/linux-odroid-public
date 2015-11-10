@@ -613,7 +613,7 @@ static void vp_video_buffer(struct mixer_context *ctx,
 				to_exynos_plane_state(plane->base.state);
 	struct drm_display_mode *mode = &state->base.crtc->state->adjusted_mode;
 	struct mixer_resources *res = &ctx->mixer_res;
-	struct drm_framebuffer *fb = state->base.fb;
+	struct drm_framebuffer *fb = state->fb;
 	unsigned long flags;
 	dma_addr_t luma_addr[2], chroma_addr[2];
 	bool tiled_mode = false;
@@ -723,7 +723,7 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
 				to_exynos_plane_state(plane->base.state);
 	struct drm_display_mode *mode = &state->base.crtc->state->adjusted_mode;
 	struct mixer_resources *res = &ctx->mixer_res;
-	struct drm_framebuffer *fb = state->base.fb;
+	struct drm_framebuffer *fb = state->fb;
 	unsigned long flags;
 	unsigned int win = plane->zpos;
 	unsigned int x_ratio = 0, y_ratio = 0;

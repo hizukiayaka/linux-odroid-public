@@ -57,9 +57,12 @@ struct exynos_drm_rect {
  *       (clipped to visible part).
  * @h_ratio: horizontal scaling ratio, 16.16 fixed point
  * @v_ratio: vertical scaling ratio, 16.16 fixed point
+ * @fb: framebuffer with image data to be displayed (drivers should use this
+ *      instead of .base->fb)
  *
- * this structure consists plane state data that will be applied to hardware
- * specific overlay info.
+ * This structure consists plane state data that will be applied to hardware
+ * specific overlay info. Some data is duplicated (comparing with base state)
+ * to let common code to modify it for internal use.
  */
 
 struct exynos_drm_plane_state {
@@ -68,6 +71,7 @@ struct exynos_drm_plane_state {
 	struct exynos_drm_rect src;
 	unsigned int h_ratio;
 	unsigned int v_ratio;
+	struct drm_framebuffer *fb;
 };
 
 static inline struct exynos_drm_plane_state *
