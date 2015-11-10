@@ -42,7 +42,6 @@
  * 7. need to power_on implement power and sysmmu ctrl.
  */
 
-#define get_ipp_context(dev)	platform_get_drvdata(to_platform_device(dev))
 #define ipp_is_m2m_cmd(c)	(c == IPP_CMD_M2M)
 
 /*
@@ -95,6 +94,7 @@ struct ipp_context {
 	struct workqueue_struct	*cmd_workq;
 };
 
+static struct ipp_context *ctx;
 static LIST_HEAD(exynos_drm_ippdrv_list);
 static DEFINE_MUTEX(exynos_drm_ippdrv_lock);
 static BLOCKING_NOTIFIER_HEAD(exynos_drm_ippnb_list);
@@ -226,9 +226,6 @@ static struct exynos_drm_ippdrv *ipp_find_drv_by_handle(u32 prop_id)
 int exynos_drm_ipp_get_property(struct drm_device *drm_dev, void *data,
 		struct drm_file *file)
 {
-	struct drm_exynos_file_private *file_priv = file->driver_priv;
-	struct device *dev = file_priv->ipp_dev;
-	struct ipp_context *ctx = get_ipp_context(dev);
 	struct drm_exynos_ipp_prop_list *prop_list = data;
 	struct exynos_drm_ippdrv *ippdrv;
 	int count = 0;
@@ -320,9 +317,6 @@ static struct drm_exynos_ipp_event_work *ipp_create_event_work(void)
 int exynos_drm_ipp_set_property(struct drm_device *drm_dev, void *data,
 		struct drm_file *file)
 {
-	struct drm_exynos_file_private *file_priv = file->driver_priv;
-	struct device *dev = file_priv->ipp_dev;
-	struct ipp_context *ctx = get_ipp_context(dev);
 	struct drm_exynos_ipp_property *property = data;
 	struct exynos_drm_ippdrv *ippdrv;
 	struct drm_exynos_ipp_cmd_node *c_node;
@@ -798,22 +792,18 @@ static int ipp_set_mem_node(struct exynos_drm_ippdrv *ippdrv,
 	return ret;
 }
 
-static void ipp_handle_cmd_work(struct device *dev,
-		struct exynos_drm_ippdrv *ippdrv,
-		struct drm_exynos_ipp_cmd_work *cmd_work,
-		struct drm_exynos_ipp_cmd_node *c_node)
+static void ipp_handle_cmd_work(struct exynos_drm_ippdrv *ippdrv,
+				struct drm_exynos_ipp_cmd_work *cmd_work,
+				struct drm_exynos_ipp_cmd_node *c_node)
 {
-	struct ipp_context *ctx = get_ipp_context(dev);
-
 	cmd_work->ippdrv = ippdrv;
 	cmd_work->c_node = c_node;
 	queue_work(ctx->cmd_workq, &cmd_work->work);
 }
 
-static int ipp_queue_buf_with_run(struct device *dev,
-		struct drm_exynos_ipp_cmd_node *c_node,
-		struct drm_exynos_ipp_mem_node *m_node,
-		struct drm_exynos_ipp_queue_buf *qbuf)
+static int ipp_queue_buf_with_run(struct drm_exynos_ipp_cmd_node *c_node,
+				  struct drm_exynos_ipp_mem_node *m_node,
+				  struct drm_exynos_ipp_queue_buf *qbuf)
 {
 	struct exynos_drm_ippdrv *ippdrv;
 	struct drm_exynos_ipp_property *property;
@@ -854,7 +844,7 @@ static int ipp_queue_buf_with_run(struct device *dev,
 		struct drm_exynos_ipp_cmd_work *cmd_work = c_node->start_work;
 
 		cmd_work->ctrl = IPP_CTRL_PLAY;
-		ipp_handle_cmd_work(dev, ippdrv, cmd_work, c_node);
+		ipp_handle_cmd_work(ippdrv, cmd_work, c_node);
 	} else {
 		ret = ipp_set_mem_node(ippdrv, c_node, m_node);
 		if (ret) {
@@ -888,9 +878,6 @@ static void ipp_clean_queue_buf(struct drm_device *drm_dev,
 int exynos_drm_ipp_queue_buf(struct drm_device *drm_dev, void *data,
 		struct drm_file *file)
 {
-	struct drm_exynos_file_private *file_priv = file->driver_priv;
-	struct device *dev = file_priv->ipp_dev;
-	struct ipp_context *ctx = get_ipp_context(dev);
 	struct drm_exynos_ipp_queue_buf *qbuf = data;
 	struct drm_exynos_ipp_cmd_node *c_node;
 	struct drm_exynos_ipp_mem_node *m_node;
@@ -945,7 +932,7 @@ int exynos_drm_ipp_queue_buf(struct drm_device *drm_dev, void *data,
 			 * M2M case run play control for streaming feature.
 			 * other case set address and waiting.
 			 */
-			ret = ipp_queue_buf_with_run(dev, c_node, m_node, qbuf);
+			ret = ipp_queue_buf_with_run(c_node, m_node, qbuf);
 			if (ret) {
 				DRM_ERROR("failed to run command.\n");
 				goto err_clean_node;
@@ -1019,10 +1006,7 @@ err_status:
 int exynos_drm_ipp_cmd_ctrl(struct drm_device *drm_dev, void *data,
 		struct drm_file *file)
 {
-	struct drm_exynos_file_private *file_priv = file->driver_priv;
 	struct exynos_drm_ippdrv *ippdrv = NULL;
-	struct device *dev = file_priv->ipp_dev;
-	struct ipp_context *ctx = get_ipp_context(dev);
 	struct drm_exynos_ipp_cmd_ctrl *cmd_ctrl = data;
 	struct drm_exynos_ipp_cmd_work *cmd_work;
 	struct drm_exynos_ipp_cmd_node *c_node;
@@ -1068,12 +1052,12 @@ int exynos_drm_ipp_cmd_ctrl(struct drm_device *drm_dev, void *data,
 
 		cmd_work = c_node->start_work;
 		cmd_work->ctrl = cmd_ctrl->ctrl;
-		ipp_handle_cmd_work(dev, ippdrv, cmd_work, c_node);
+		ipp_handle_cmd_work(ippdrv, cmd_work, c_node);
 		break;
 	case IPP_CTRL_STOP:
 		cmd_work = c_node->stop_work;
 		cmd_work->ctrl = cmd_ctrl->ctrl;
-		ipp_handle_cmd_work(dev, ippdrv, cmd_work, c_node);
+		ipp_handle_cmd_work(ippdrv, cmd_work, c_node);
 
 		if (!wait_for_completion_timeout(&c_node->stop_complete,
 		    msecs_to_jiffies(300))) {
@@ -1093,7 +1077,7 @@ int exynos_drm_ipp_cmd_ctrl(struct drm_device *drm_dev, void *data,
 	case IPP_CTRL_PAUSE:
 		cmd_work = c_node->stop_work;
 		cmd_work->ctrl = cmd_ctrl->ctrl;
-		ipp_handle_cmd_work(dev, ippdrv, cmd_work, c_node);
+		ipp_handle_cmd_work(ippdrv, cmd_work, c_node);
 
 		if (!wait_for_completion_timeout(&c_node->stop_complete,
 		    msecs_to_jiffies(200))) {
@@ -1107,7 +1091,7 @@ int exynos_drm_ipp_cmd_ctrl(struct drm_device *drm_dev, void *data,
 		c_node->state = IPP_STATE_START;
 		cmd_work = c_node->start_work;
 		cmd_work->ctrl = cmd_ctrl->ctrl;
-		ipp_handle_cmd_work(dev, ippdrv, cmd_work, c_node);
+		ipp_handle_cmd_work(ippdrv, cmd_work, c_node);
 		break;
 	default:
 		DRM_ERROR("could not support this state currently.\n");
@@ -1588,7 +1572,6 @@ err_completion:
 
 static int ipp_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
 {
-	struct ipp_context *ctx = get_ipp_context(dev);
 	struct exynos_drm_ippdrv *ippdrv;
 	int ret, count = 0;
 
@@ -1640,7 +1623,6 @@ err:
 static void ipp_subdrv_remove(struct drm_device *drm_dev, struct device *dev)
 {
 	struct exynos_drm_ippdrv *ippdrv, *t;
-	struct ipp_context *ctx = get_ipp_context(dev);
 
 	/* get ipp driver entry */
 	list_for_each_entry_safe(ippdrv, t, &exynos_drm_ippdrv_list, drv_list) {
@@ -1670,7 +1652,6 @@ static void ipp_subdrv_close(struct drm_device *drm_dev, struct device *dev,
 		struct drm_file *file)
 {
 	struct exynos_drm_ippdrv *ippdrv = NULL;
-	struct ipp_context *ctx = get_ipp_context(dev);
 	struct drm_exynos_ipp_cmd_node *c_node, *tc_node;
 	int count = 0;
 
@@ -1709,7 +1690,6 @@ static void ipp_subdrv_close(struct drm_device *drm_dev, struct device *dev,
 static int ipp_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct ipp_context *ctx;
 	struct exynos_drm_subdrv *subdrv;
 	int ret;
 
@@ -1778,8 +1758,6 @@ err_event_workq:
 
 static int ipp_remove(struct platform_device *pdev)
 {
-	struct ipp_context *ctx = platform_get_drvdata(pdev);
-
 	/* unregister sub driver */
 	exynos_drm_subdrv_unregister(&ctx->subdrv);
 
@@ -1793,6 +1771,8 @@ static int ipp_remove(struct platform_device *pdev)
 	/* destroy command, event work queue */
 	destroy_workqueue(ctx->cmd_workq);
 	destroy_workqueue(ctx->event_workq);
+
+	ctx = NULL;
 
 	return 0;
 }
