@@ -56,8 +56,6 @@ extern void exynos4412_qos(u8 tm, u8 ac);
  * @crtc_h: window height to be displayed (hardware screen).
  * @h_ratio: horizontal scaling ratio, 16.16 fixed point
  * @v_ratio: vertical scaling ratio, 16.16 fixed point
- * @dma_addr: array of bus(accessed by dma) address to the memory region
- *	      allocated for a overlay.
  * @zpos: order of overlay layer(z position).
  *
  * this structure is common to exynos SoC and its contents would be copied
@@ -76,7 +74,6 @@ struct exynos_drm_plane {
 	unsigned int crtc_h;
 	unsigned int h_ratio;
 	unsigned int v_ratio;
-	dma_addr_t dma_addr[MAX_FB_BUFFER];
 	unsigned int zpos;
 	struct drm_framebuffer *pending_fb;
 };
