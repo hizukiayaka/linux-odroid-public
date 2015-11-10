@@ -88,7 +88,7 @@ struct drm_exynos_ipp_cmd_node {
  * @size: Y, Cb, Cr each planar size.
  */
 struct drm_exynos_ipp_buf_info {
-	unsigned long	handles[EXYNOS_DRM_PLANAR_MAX];
+	struct exynos_drm_gem	*obj[EXYNOS_DRM_PLANAR_MAX];
 	dma_addr_t	base[EXYNOS_DRM_PLANAR_MAX];
 	uint64_t	size[EXYNOS_DRM_PLANAR_MAX];
 };
