@@ -185,6 +185,25 @@ static struct drm_plane_funcs exynos_plane_funcs = {
 };
 
 static int
+exynos_drm_plane_check_format(const struct exynos_drm_plane_config *config,
+			      struct exynos_drm_plane_state *state)
+{
+	uint32_t format = EXYNOS_BAD_PIXEL_FORMAT;
+	int i;
+
+	for (i = 0; i < config->num_pixel_formats; i++)
+		if (config->pixel_formats[i] == state->base.fb->pixel_format)
+			format = state->base.fb->pixel_format;
+
+	if (format == EXYNOS_BAD_PIXEL_FORMAT) {
+		DRM_DEBUG_KMS("unsupported pixel format");
+		return -ENOTSUPP;
+	}
+
+	return 0;
+}
+
+static int
 exynos_drm_plane_check_size(const struct exynos_drm_plane_config *config,
 			    struct exynos_drm_plane_state *state)
 {
@@ -227,6 +246,10 @@ static int exynos_plane_atomic_check(struct drm_plane *plane,
 
 	/* translate state into exynos_state */
 	exynos_plane_mode_set(exynos_state);
+
+	ret = exynos_drm_plane_check_format(exynos_plane->config, exynos_state);
+	if (ret)
+		return ret;
 
 	ret = exynos_drm_plane_check_size(exynos_plane->config, exynos_state);
 	return ret;
