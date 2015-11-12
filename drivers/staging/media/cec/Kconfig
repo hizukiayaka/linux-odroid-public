@@ -1,0 +1,8 @@
+config MEDIA_CEC
+	tristate "CEC API (EXPERIMENTAL)"
+	select MEDIA_CEC_EDID
+	---help---
+	  Enable the CEC API.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cec.
