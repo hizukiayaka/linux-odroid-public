@@ -4,3 +4,4 @@
 [PATCH v6 0/6] hwmon: thermal: Odroid U3: Provide support for Odroid U3 fan
 [PATCH v4 00/20] PM / devfreq: Add generic exynos bus frequency driver and new passive governor
 [PATCH v5 0/5] drm/exynos: introduce generic zpos and blending properties
+[PATCH 00/25] Exynos DRM: new life of IPP (Image Post Processing) subsystem
