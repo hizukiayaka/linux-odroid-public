@@ -392,7 +392,7 @@ static void decon_atomic_begin(struct exynos_drm_crtc *crtc,
 	if (ctx->suspended)
 		return;
 
-	decon_shadow_protect_win(ctx, plane->zpos, true);
+	decon_shadow_protect_win(ctx, plane->index, true);
 }
 
 static void decon_update_plane(struct exynos_drm_crtc *crtc,
@@ -406,7 +406,7 @@ static void decon_update_plane(struct exynos_drm_crtc *crtc,
 	unsigned long val, alpha;
 	unsigned int last_x;
 	unsigned int last_y;
-	unsigned int win = plane->zpos;
+	unsigned int win = plane->index;
 	unsigned int bpp = fb->bits_per_pixel >> 3;
 	unsigned int pitch = fb->pitches[0];
 
@@ -497,7 +497,7 @@ static void decon_disable_plane(struct exynos_drm_crtc *crtc,
 				struct exynos_drm_plane *plane)
 {
 	struct decon_context *ctx = crtc->ctx;
-	unsigned int win = plane->zpos;
+	unsigned int win = plane->index;
 	u32 val;
 
 	if (ctx->suspended)
@@ -524,7 +524,7 @@ static void decon_atomic_flush(struct exynos_drm_crtc *crtc,
 	if (ctx->suspended)
 		return;
 
-	decon_shadow_protect_win(ctx, plane->zpos, false);
+	decon_shadow_protect_win(ctx, plane->index, false);
 }
 
 static void decon_init(struct decon_context *ctx)
@@ -653,7 +653,7 @@ static int decon_bind(struct device *dev, struct device *master, void *data)
 	for (i = 0; i < WINDOWS_NR; i++) {
 		ctx->configs[i].pixel_formats = decon_formats;
 		ctx->configs[i].num_pixel_formats = ARRAY_SIZE(decon_formats);
-		ctx->configs[i].zpos = i;
+		ctx->configs[i].index = i;
 		ctx->configs[i].type = decon_win_types[i];
 
 		ret = exynos_plane_init(drm_dev, &ctx->planes[i],

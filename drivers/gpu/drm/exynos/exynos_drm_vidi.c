@@ -457,7 +457,7 @@ static int vidi_bind(struct device *dev, struct device *master, void *data)
 	plane_config.num_pixel_formats = ARRAY_SIZE(formats);
 
 	for (i = 0; i < WINDOWS_NR; i++) {
-		plane_config.zpos = i;
+		plane_config.index = i;
 		plane_config.type = vidi_win_types[i];
 
 		ret = exynos_plane_init(drm_dev, &ctx->planes[i],

@@ -321,10 +321,10 @@ int exynos_plane_init(struct drm_device *dev,
 
 	drm_plane_helper_add(&exynos_plane->base, &plane_helper_funcs);
 
-	exynos_plane->zpos = config->zpos;
+	exynos_plane->index = config->index;
 	exynos_plane->config = config;
 
-	exynos_plane_attach_zpos_property(&exynos_plane->base, config->zpos);
+	exynos_plane_attach_zpos_property(&exynos_plane->base, config->index);
 
 	return 0;
 }

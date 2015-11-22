@@ -646,7 +646,7 @@ static void fimd_atomic_begin(struct exynos_drm_crtc *crtc,
 	if (ctx->suspended)
 		return;
 
-	fimd_shadow_protect_win(ctx, plane->zpos, true);
+	fimd_shadow_protect_win(ctx, plane->index, true);
 }
 
 static void fimd_atomic_flush(struct exynos_drm_crtc *crtc,
@@ -657,7 +657,7 @@ static void fimd_atomic_flush(struct exynos_drm_crtc *crtc,
 	if (ctx->suspended)
 		return;
 
-	fimd_shadow_protect_win(ctx, plane->zpos, false);
+	fimd_shadow_protect_win(ctx, plane->index, false);
 }
 
 static void fimd_update_plane(struct exynos_drm_crtc *crtc,
@@ -670,7 +670,7 @@ static void fimd_update_plane(struct exynos_drm_crtc *crtc,
 	dma_addr_t dma_addr;
 	unsigned long val, size, offset;
 	unsigned int last_x, last_y, buf_offsize, line_size;
-	unsigned int win = plane->zpos;
+	unsigned int win = plane->index;
 	unsigned int bpp = fb->bits_per_pixel >> 3;
 	unsigned int pitch = fb->pitches[0];
 
@@ -756,7 +756,7 @@ static void fimd_disable_plane(struct exynos_drm_crtc *crtc,
 			       struct exynos_drm_plane *plane)
 {
 	struct fimd_context *ctx = crtc->ctx;
-	unsigned int win = plane->zpos;
+	unsigned int win = plane->index;
 
 	if (ctx->suspended)
 		return;
@@ -943,7 +943,7 @@ static int fimd_bind(struct device *dev, struct device *master, void *data)
 	for (i = 0; i < WINDOWS_NR; i++) {
 		ctx->configs[i].pixel_formats = fimd_formats;
 		ctx->configs[i].num_pixel_formats = ARRAY_SIZE(fimd_formats);
-		ctx->configs[i].zpos = i;
+		ctx->configs[i].index = i;
 		ctx->configs[i].type = fimd_win_types[i];
 		ret = exynos_plane_init(drm_dev, &ctx->planes[i],
 					1 << ctx->pipe, &ctx->configs[i]);

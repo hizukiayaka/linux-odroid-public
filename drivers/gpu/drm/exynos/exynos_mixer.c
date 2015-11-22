@@ -152,21 +152,21 @@ static const struct layer_cfg vp_default_cfg[] = {
 
 static const struct exynos_drm_plane_config plane_configs[MIXER_WIN_NR] = {
 	{
-		.zpos = 0,
+		.index = 0,
 		.type = DRM_PLANE_TYPE_PRIMARY,
 		.pixel_formats = mixer_formats,
 		.num_pixel_formats = ARRAY_SIZE(mixer_formats),
 		.capabilities = EXYNOS_DRM_PLANE_CAP_DOUBLE_X |
 				EXYNOS_DRM_PLANE_CAP_DOUBLE_Y,
 	}, {
-		.zpos = 1,
+		.index = 1,
 		.type = DRM_PLANE_TYPE_CURSOR,
 		.pixel_formats = mixer_formats,
 		.num_pixel_formats = ARRAY_SIZE(mixer_formats),
 		.capabilities = EXYNOS_DRM_PLANE_CAP_DOUBLE_X |
 				EXYNOS_DRM_PLANE_CAP_DOUBLE_Y,
 	}, {
-		.zpos = 2,
+		.index = 2,
 		.type = DRM_PLANE_TYPE_OVERLAY,
 		.pixel_formats = vp_formats,
 		.num_pixel_formats = ARRAY_SIZE(vp_formats),
@@ -714,7 +714,7 @@ static void vp_video_buffer(struct mixer_context *ctx,
 
 	mixer_cfg_scan(ctx, mode->vdisplay);
 	mixer_cfg_rgb_fmt(ctx, mode->vdisplay);
-	mixer_cfg_layer(ctx, plane->zpos, true);
+	mixer_cfg_layer(ctx, plane->index, true);
 	mixer_run(ctx);
 
 	mixer_vsync_set_update(ctx, true);
@@ -740,7 +740,7 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
 	struct mixer_resources *res = &ctx->mixer_res;
 	struct drm_framebuffer *fb = state->fb;
 	unsigned long flags;
-	unsigned int win = plane->zpos;
+	unsigned int win = plane->index;
 	unsigned int x_ratio = 0, y_ratio = 0;
 	unsigned int src_x_offset, src_y_offset, dst_x_offset, dst_y_offset;
 	dma_addr_t dma_addr;
@@ -1133,7 +1133,7 @@ static void mixer_update_plane(struct exynos_drm_crtc *crtc,
 {
 	struct mixer_context *mixer_ctx = crtc->ctx;
 
-	DRM_DEBUG_KMS("win: %d\n", plane->zpos);
+	DRM_DEBUG_KMS("win: %d\n", plane->index);
 
 	if (!test_bit(MXR_BIT_POWERED, &mixer_ctx->flags))
 		return;
@@ -1151,7 +1151,7 @@ static void mixer_disable_plane(struct exynos_drm_crtc *crtc,
 	struct mixer_resources *res = &mixer_ctx->mixer_res;
 	unsigned long flags;
 
-	DRM_DEBUG_KMS("win: %d\n", plane->zpos);
+	DRM_DEBUG_KMS("win: %d\n", plane->index);
 
 	if (!test_bit(MXR_BIT_POWERED, &mixer_ctx->flags))
 		return;
@@ -1159,7 +1159,7 @@ static void mixer_disable_plane(struct exynos_drm_crtc *crtc,
 	spin_lock_irqsave(&res->reg_slock, flags);
 	mixer_vsync_set_update(mixer_ctx, false);
 
-	mixer_cfg_layer(mixer_ctx, plane->zpos, false);
+	mixer_cfg_layer(mixer_ctx, plane->index, false);
 
 	mixer_vsync_set_update(mixer_ctx, true);
 	spin_unlock_irqrestore(&res->reg_slock, flags);
