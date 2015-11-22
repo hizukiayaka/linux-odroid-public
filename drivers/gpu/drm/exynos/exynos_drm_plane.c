@@ -303,6 +303,7 @@ static void exynos_plane_attach_zpos_property(struct drm_plane *plane,
 int exynos_plane_init(struct drm_device *dev,
 		      struct exynos_drm_plane *exynos_plane,
 		      unsigned long possible_crtcs,
+		      unsigned int zpos,
 		      const struct exynos_drm_plane_config *config)
 {
 	int err;
@@ -324,7 +325,7 @@ int exynos_plane_init(struct drm_device *dev,
 	exynos_plane->index = config->index;
 	exynos_plane->config = config;
 
-	exynos_plane_attach_zpos_property(&exynos_plane->base, config->index);
+	exynos_plane_attach_zpos_property(&exynos_plane->base, zpos);
 
 	return 0;
 }

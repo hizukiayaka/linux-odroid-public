@@ -657,7 +657,7 @@ static int decon_bind(struct device *dev, struct device *master, void *data)
 		ctx->configs[i].type = decon_win_types[i];
 
 		ret = exynos_plane_init(drm_dev, &ctx->planes[i],
-					1 << ctx->pipe, &ctx->configs[i]);
+					1 << ctx->pipe, i, &ctx->configs[i]);
 		if (ret)
 			return ret;
 	}

@@ -1334,12 +1334,14 @@ static int mixer_bind(struct device *dev, struct device *manager, void *data)
 	if (ret)
 		return ret;
 
-	for (i = 0; i < MIXER_WIN_NR; i++) {
-		if (i == VP_DEFAULT_WIN && !ctx->vp_enabled)
-			continue;
+	for (i = 0; i < ctx->num_layer; i++) {
+		const unsigned index = ctx->layer_cfg[i].index;
+		const unsigned prio = ctx->layer_cfg[i].priority;
 
-		ret = exynos_plane_init(drm_dev, &ctx->planes[i],
-					1 << ctx->pipe, &plane_configs[i]);
+		/* Set z-position of plane as layer priority minus 1. */
+		ret = exynos_plane_init(drm_dev, &ctx->planes[index],
+					1 << ctx->pipe, prio - 1,
+					&plane_configs[index]);
 		if (ret)
 			return ret;
 	}
