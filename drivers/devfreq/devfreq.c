@@ -190,6 +190,31 @@ static struct devfreq_governor *find_devfreq_governor(const char *name)
 
 /* Load monitoring helper functions for governors use */
 
+static int update_devfreq_passive(struct devfreq *devfreq, unsigned long freq)
+{
+	struct devfreq *passive;
+	unsigned long rate;
+	int ret;
+
+	list_for_each_entry(passive, &devfreq->passive_dev_list, passive_node) {
+		if (!passive->governor)
+			continue;
+		rate = freq;
+
+		ret = passive->governor->get_target_freq(passive, &rate);
+		if (ret)
+			return ret;
+
+		ret = passive->profile->target(passive->dev.parent, &rate, 0);
+		if (ret)
+			return ret;
+
+		passive->previous_freq = rate;
+	}
+
+	return 0;
+}
+
 /**
  * update_devfreq() - Reevaluate the device and configure frequency.
  * @devfreq:	the devfreq instance.
@@ -233,9 +258,17 @@ int update_devfreq(struct devfreq *devfreq)
 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
 	}
 
+	if (!list_empty(&devfreq->passive_dev_list)
+		&& devfreq->previous_freq > freq)
+		update_devfreq_passive(devfreq, freq);
+
 	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
 	if (err)
 		return err;
+
+	if (!list_empty(&devfreq->passive_dev_list)
+		&& devfreq->previous_freq < freq)
+		update_devfreq_passive(devfreq, freq);
 
 	if (devfreq->profile->freq_table)
 		if (devfreq_update_status(devfreq, freq))
@@ -442,6 +475,10 @@ static void _remove_devfreq(struct devfreq *devfreq)
 		return;
 	}
 	list_del(&devfreq->node);
+	list_del(&devfreq->passive_node);
+	if (!list_empty(&devfreq->passive_dev_list))
+		list_del_init(&devfreq->passive_dev_list);
+
 	mutex_unlock(&devfreq_list_lock);
 
 	if (devfreq->governor)
@@ -557,6 +594,16 @@ struct devfreq *devfreq_add_device(struct device *dev,
 		dev_err(dev, "%s: Unable to start governor for the device\n",
 			__func__);
 		goto err_init;
+	}
+
+	if (!strncmp(devfreq->governor_name, "passive", 7)) {
+		struct devfreq *parent_devfreq =
+			((struct devfreq_passive_data *)data)->parent;
+
+		list_add(&devfreq->passive_node,
+			&parent_devfreq->passive_dev_list);
+	} else {
+		INIT_LIST_HEAD(&devfreq->passive_dev_list);
 	}
 
 	return devfreq;

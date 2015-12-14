@@ -177,6 +177,9 @@ struct devfreq {
 	unsigned int *trans_table;
 	unsigned long *time_in_state;
 	unsigned long last_stat_updated;
+
+	struct list_head passive_dev_list;
+	struct list_head passive_node;
 };
 
 #if defined(CONFIG_PM_DEVFREQ)
@@ -240,6 +243,18 @@ struct devfreq_simple_ondemand_data {
 	unsigned int downdifferential;
 };
 #endif
+
+/**
+ * struct devfreq_passive_data - void *data fed to struct devfreq
+ *	and devfreq_add_device
+ * @parent:		The parent devfreq device.
+ *
+ * If the fed devfreq_passive_data pointer is NULL to the governor,
+ * the governor return ERROR.
+ */
+struct devfreq_passive_data {
+	struct devfreq *parent;
+};
 
 #else /* !CONFIG_PM_DEVFREQ */
 static inline struct devfreq *devfreq_add_device(struct device *dev,
