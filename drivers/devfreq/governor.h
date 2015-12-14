@@ -18,6 +18,13 @@
 
 #define to_devfreq(DEV)	container_of((DEV), struct devfreq, dev)
 
+/* Devfreq governor type */
+#define DEVFREQ_GOV_ONDEMAND			0x1
+#define DEVFREQ_GOV_PERFORMANCE			0x2
+#define DEVFREQ_GOV_POWERSAVE			0x3
+#define DEVFREQ_GOV_USERSPACE			0x4
+#define DEVFREQ_GOV_PASSIVE			0x4
+
 /* Devfreq events */
 #define DEVFREQ_GOV_START			0x1
 #define DEVFREQ_GOV_STOP			0x2
