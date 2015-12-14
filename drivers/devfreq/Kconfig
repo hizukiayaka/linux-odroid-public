@@ -64,6 +64,15 @@ config DEVFREQ_GOV_USERSPACE
 	  Otherwise, the governor does not change the frequnecy
 	  given at the initialization.
 
+config DEVFREQ_GOV_PASSIVE
+	tristate "Passive"
+	help
+	  Sets the frequency by other governors (simple_ondemand, performance,
+	  powersave, usersapce) of a parent devfreq device. This governor
+	  always has the dependency on the chosen frequency from paired
+	  governor. This governor does not change the frequency by oneself
+	  through sysfs entry.
+
 comment "DEVFREQ Drivers"
 
 config ARM_EXYNOS_BUS_DEVFREQ
