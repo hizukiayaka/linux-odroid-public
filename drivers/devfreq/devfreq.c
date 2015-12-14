@@ -597,7 +597,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
 		goto err_init;
 	}
 
-	if (!strncmp(devfreq->governor_name, "passive", 7)) {
+	if (devfreq->governor->type == DEVFREQ_GOV_PASSIVE) {
 		struct devfreq *parent_devfreq =
 			((struct devfreq_passive_data *)data)->parent;
 
@@ -963,13 +963,23 @@ static ssize_t available_governors_show(struct device *d,
 					struct device_attribute *attr,
 					char *buf)
 {
-	struct devfreq_governor *tmp_governor;
+	struct devfreq *devfreq = to_devfreq(d);
 	ssize_t count = 0;
 
 	mutex_lock(&devfreq_list_lock);
-	list_for_each_entry(tmp_governor, &devfreq_governor_list, node)
+	if (devfreq->governor->type == DEVFREQ_GOV_PASSIVE) {
 		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
-				   "%s ", tmp_governor->name);
+					   "%s ", devfreq->governor->name);
+	} else {
+		struct devfreq_governor *tmp_governor;
+
+		list_for_each_entry(tmp_governor, &devfreq_governor_list, node) {
+			if (tmp_governor->type == DEVFREQ_GOV_PASSIVE)
+				continue;
+			count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+					   "%s ", tmp_governor->name);
+		}
+	}
 	mutex_unlock(&devfreq_list_lock);
 
 	/* Truncate the trailing space */
@@ -1006,6 +1016,11 @@ static DEVICE_ATTR_RO(target_freq);
 static ssize_t polling_interval_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
+	struct devfreq *df = to_devfreq(dev);
+
+	if (df->governor->type == DEVFREQ_GOV_PASSIVE)
+		return sprintf(buf, "Not Supported.\n");
+
 	return sprintf(buf, "%d\n", to_devfreq(dev)->profile->polling_ms);
 }
 
@@ -1018,6 +1033,9 @@ static ssize_t polling_interval_store(struct device *dev,
 	int ret;
 
 	if (!df->governor)
+		return -EINVAL;
+
+	if (df->governor->type == DEVFREQ_GOV_PASSIVE)
 		return -EINVAL;
 
 	ret = sscanf(buf, "%u", &value);
@@ -1136,6 +1154,9 @@ static ssize_t trans_stat_show(struct device *dev,
 	ssize_t len;
 	int i, j;
 	unsigned int max_state = devfreq->profile->max_state;
+
+	if (max_state == 0 || devfreq->governor->type == DEVFREQ_GOV_PASSIVE)
+		return sprintf(buf, "Not Supported.\n");
 
 	if (!devfreq->stop_polling &&
 			devfreq_update_status(devfreq, devfreq->previous_freq))
