@@ -1194,18 +1194,6 @@ static struct mixer_drv_data exynos4210_mxr_drv_data = {
 	.has_sclk = 1,
 };
 
-static const struct platform_device_id mixer_driver_types[] = {
-	{
-		.name		= "s5p-mixer",
-		.driver_data	= (unsigned long)&exynos4210_mxr_drv_data,
-	}, {
-		.name		= "exynos5-mixer",
-		.driver_data	= (unsigned long)&exynos5250_mxr_drv_data,
-	}, {
-		/* end node */
-	}
-};
-
 static struct of_device_id mixer_match_types[] = {
 	{
 		.compatible = "samsung,exynos4210-mixer",
@@ -1284,7 +1272,11 @@ static int mixer_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct mixer_drv_data *drv;
 	struct mixer_context *ctx;
+	const struct of_device_id *match;
 	int ret;
+
+	if (!dev->of_node)
+		return -ENODEV;
 
 	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx) {
@@ -1292,15 +1284,8 @@ static int mixer_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	if (dev->of_node) {
-		const struct of_device_id *match;
-
-		match = of_match_node(mixer_match_types, dev->of_node);
-		drv = (struct mixer_drv_data *)match->data;
-	} else {
-		drv = (struct mixer_drv_data *)
-			platform_get_device_id(pdev)->driver_data;
-	}
+	match = of_match_node(mixer_match_types, dev->of_node);
+	drv = (struct mixer_drv_data *)match->data;
 
 	ctx->pdev = pdev;
 	ctx->dev = dev;
@@ -1394,5 +1379,4 @@ struct platform_driver mixer_driver = {
 	},
 	.probe = mixer_probe,
 	.remove = mixer_remove,
-	.id_table	= mixer_driver_types,
 };
