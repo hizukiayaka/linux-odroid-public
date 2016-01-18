@@ -482,6 +482,10 @@ passive:
 
 out:
 	max_state = bus->devfreq->profile->max_state;
+
+	if (bus->devfreq->profile->freq_table == NULL || max_state == 0)
+		return 0;
+
 	min_freq = (bus->devfreq->profile->freq_table[0] / 1000);
 	max_freq = (bus->devfreq->profile->freq_table[max_state - 1] / 1000);
 	pr_info("exynos-bus: new bus device registered: %s (%6ld KHz ~ %6ld KHz)\n",
