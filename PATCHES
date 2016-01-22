@@ -7,3 +7,4 @@
 [PATCH 00/25] Exynos DRM: new life of IPP (Image Post Processing) subsystem
 [PATCH 0/3] ARM: dts: Enable Exynos RNG module
 [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+[PATCH v2 00/10] rtc: max77686: Extend driver and add max77802 support
