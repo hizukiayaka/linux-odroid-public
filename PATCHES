@@ -8,3 +8,4 @@
 [PATCH 0/5] Misc fixes/improvements for Exynos DRM
 [PATCH 0/2] Exynos DRM: resolve problems with DMA and virtual exynos-drm device
 [PATCH v2 00/13] SYSMMU driver update and support for Exynos 5433
+[PATCH v2 00/10] rtc: max77686: Extend driver and add max77802 support
