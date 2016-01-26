@@ -530,9 +530,7 @@ static void mixer_cfg_rgb_fmt(struct mixer_context *ctx, unsigned int height)
 	struct mixer_resources *res = &ctx->mixer_res;
 	u32 val;
 
-	if (height == 480) {
-		val = MXR_CFG_RGB601_0_255;
-	} else if (height == 576) {
+	if (height == 480 || height == 576 || height == 600) {
 		val = MXR_CFG_RGB601_0_255;
 	} else if (height == 720) {
 		val = MXR_CFG_RGB709_16_235;
@@ -1257,9 +1255,14 @@ static int mixer_atomic_check(struct exynos_drm_crtc *crtc,
 		mode->hdisplay, mode->vdisplay, mode->vrefresh,
 		(mode->flags & DRM_MODE_FLAG_INTERLACE) ? 1 : 0);
 
+	/* Check against resolution ranges. */
 	if ((w >= 464 && w <= 720 && h >= 261 && h <= 576) ||
 		(w >= 1024 && w <= 1280 && h >= 576 && h <= 720) ||
 		(w >= 1664 && w <= 1920 && h >= 936 && h <= 1080))
+		return 0;
+
+	/* Check against some specific resolutions. */
+	if ((w == 1024 && h == 600))
 		return 0;
 
 	return -EINVAL;
