@@ -305,6 +305,7 @@ struct drm_plane_helper_funcs;
  * @mode_changed: crtc_state->mode or crtc_state->enable has been changed
  * @active_changed: crtc_state->active has been toggled.
  * @connectors_changed: connectors to this crtc have been updated
+ * @zpos_changed: zpos values of planes on this crtc have been updated
  * @plane_mask: bitmask of (1 << drm_plane_index(plane)) of attached planes
  * @connector_mask: bitmask of (1 << drm_connector_index(connector)) of attached connectors
  * @last_vblank_count: for helpers and drivers to capture the vblank of the
@@ -332,6 +333,7 @@ struct drm_crtc_state {
 	bool mode_changed : 1;
 	bool active_changed : 1;
 	bool connectors_changed : 1;
+	bool zpos_changed : 1;
 
 	/* attached planes bitmask:
 	 * WARNING: transitional helpers do not maintain plane_mask so
@@ -1248,6 +1250,9 @@ struct drm_connector {
  *	plane (in 16.16)
  * @src_w: width of visible portion of plane (in 16.16)
  * @src_h: height of visible portion of plane (in 16.16)
+ * @zpos: priority of the given plane on crtc (optional)
+ * @normalized_zpos: normalized value of zpos: uniqe, range from 0 to
+ *	(number of planes - 1) for given crtc
  * @state: backpointer to global drm_atomic_state
  */
 struct drm_plane_state {
@@ -1267,6 +1272,10 @@ struct drm_plane_state {
 
 	/* Plane rotation */
 	unsigned int rotation;
+
+	/* Plane zpos */
+	unsigned int zpos;
+	unsigned int normalized_zpos;
 
 	struct drm_atomic_state *state;
 };
@@ -2089,6 +2098,8 @@ struct drm_mode_config {
 	struct drm_property *tile_property;
 	struct drm_property *plane_type_property;
 	struct drm_property *rotation_property;
+	struct drm_property *zpos_property;
+	struct drm_property *zpos_immutable_property;
 	struct drm_property *prop_src_x;
 	struct drm_property *prop_src_y;
 	struct drm_property *prop_src_w;
@@ -2493,6 +2504,12 @@ extern struct drm_property *drm_mode_create_rotation_property(struct drm_device 
 							      unsigned int supported_rotations);
 extern unsigned int drm_rotation_simplify(unsigned int rotation,
 					  unsigned int supported_rotations);
+
+extern int drm_mode_create_zpos_property(struct drm_device *dev,
+					 unsigned int min, unsigned int max);
+extern int drm_mode_create_zpos_immutable_property(struct drm_device *dev,
+						   unsigned int min,
+						   unsigned int max);
 
 /* Helpers */
 
