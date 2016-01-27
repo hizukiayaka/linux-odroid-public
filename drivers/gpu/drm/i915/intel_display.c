@@ -14105,8 +14105,7 @@ void intel_create_rotation_property(struct drm_device *dev, struct intel_plane *
 		if (INTEL_INFO(dev)->gen >= 9)
 			flags |= BIT(DRM_ROTATE_90) | BIT(DRM_ROTATE_270);
 
-		dev->mode_config.rotation_property =
-			drm_mode_create_rotation_property(dev, flags);
+		drm_mode_create_rotation_property(dev, flags);
 	}
 	if (dev->mode_config.rotation_property)
 		drm_object_attach_property(&plane->base.base,
@@ -14242,8 +14241,7 @@ static struct drm_plane *intel_cursor_plane_create(struct drm_device *dev,
 
 	if (INTEL_INFO(dev)->gen >= 4) {
 		if (!dev->mode_config.rotation_property)
-			dev->mode_config.rotation_property =
-				drm_mode_create_rotation_property(dev,
+			drm_mode_create_rotation_property(dev,
 							BIT(DRM_ROTATE_0) |
 							BIT(DRM_ROTATE_180));
 		if (dev->mode_config.rotation_property)

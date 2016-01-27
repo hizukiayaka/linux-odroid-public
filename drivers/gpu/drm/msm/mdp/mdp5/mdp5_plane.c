@@ -76,8 +76,7 @@ static void mdp5_plane_install_rotation_property(struct drm_device *dev,
 		return;
 
 	if (!dev->mode_config.rotation_property)
-		dev->mode_config.rotation_property =
-			drm_mode_create_rotation_property(dev,
+		drm_mode_create_rotation_property(dev,
 			BIT(DRM_REFLECT_X) | BIT(DRM_REFLECT_Y));
 
 	if (dev->mode_config.rotation_property)

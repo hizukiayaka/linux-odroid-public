@@ -5866,10 +5866,23 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 }
 EXPORT_SYMBOL(drm_mode_config_cleanup);
 
-struct drm_property *drm_mode_create_rotation_property(struct drm_device *dev,
-						       unsigned int supported_rotations)
+/**
+ * drm_mode_create_rotation_property - create generic rotation property
+ * @dev: DRM device
+ * @supported_rotations: bitmask of supported rotation modes
+ *
+ * This function initializes generic rotation property and enables support
+ * for it in drm core. Drivers can then attach this property to planes to enable
+ * support for different rotation modes.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_mode_create_rotation_property(struct drm_device *dev,
+				      unsigned int supported_rotations)
 {
-	static const struct drm_prop_enum_list props[] = {
+	struct drm_property *prop;
+	static const struct drm_prop_enum_list values[] = {
 		{ DRM_ROTATE_0,   "rotate-0" },
 		{ DRM_ROTATE_90,  "rotate-90" },
 		{ DRM_ROTATE_180, "rotate-180" },
@@ -5878,9 +5891,13 @@ struct drm_property *drm_mode_create_rotation_property(struct drm_device *dev,
 		{ DRM_REFLECT_Y,  "reflect-y" },
 	};
 
-	return drm_property_create_bitmask(dev, 0, "rotation",
-					   props, ARRAY_SIZE(props),
-					   supported_rotations);
+	prop = drm_property_create_bitmask(dev, 0, "rotation", values,
+				ARRAY_SIZE(values), supported_rotations);
+	if (!prop)
+		return -ENOMEM;
+
+	dev->mode_config.rotation_property = prop;
+	return 0;
 }
 EXPORT_SYMBOL(drm_mode_create_rotation_property);
 
