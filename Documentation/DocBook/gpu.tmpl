@@ -1822,7 +1822,7 @@ void intel_crt_init(struct drm_device *dev)
 	<td valign="top" >Description/Restrictions</td>
 	</tr>
 	<tr>
-	<td rowspan="42" valign="top" >DRM</td>
+	<td rowspan="43" valign="top" >DRM</td>
 	<td valign="top" >Generic</td>
 	<td valign="top" >“rotation”</td>
 	<td valign="top" >BITMASK</td>
@@ -2074,7 +2074,7 @@ void intel_crt_init(struct drm_device *dev)
 	<td valign="top" >property to suggest an Y offset for a connector</td>
 	</tr>
 	<tr>
-	<td rowspan="8" valign="top" >Optional</td>
+	<td rowspan="9" valign="top" >Optional</td>
 	<td valign="top" >“scaling mode”</td>
 	<td valign="top" >ENUM</td>
 	<td valign="top" >{ "None", "Full", "Center", "Full aspect" }</td>
@@ -2151,6 +2151,16 @@ void intel_crt_init(struct drm_device *dev)
 	<td valign="top" >DRM property to gives the size of the lookup
 		table to be set on the GAMMA_LUT property (the size depends on
 		the underlying hardware).</td>
+	</tr>
+	<tr>
+	<td valign="top" > "zpos" </td>
+	<td valign="top" >RANGE</td>
+	<td valign="top" >Min=0, Max= driver dependent</td>
+	<td valign="top" >Plane</td>
+	<td valign="top" >Plane's 'z' position during blending operation (0 for background, highest for frontmost).
+		If two planes assigned to same CRTC have equal zpos values, the plane with higher plane
+		id is treated as closer to front. Can be IMMUTABLE if driver doesn't support changing
+		planes' order. Exact value range is driver dependent.</td>
 	</tr>
 	<tr>
 	<td rowspan="20" valign="top" >i915</td>
