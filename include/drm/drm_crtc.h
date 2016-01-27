@@ -1277,6 +1277,11 @@ struct drm_plane_state {
 	unsigned int zpos;
 	unsigned int normalized_zpos;
 
+	/* Plane blending */
+	unsigned int blending;
+	unsigned int alpha;
+	bool alpha_premult;
+
 	struct drm_atomic_state *state;
 };
 
@@ -2100,6 +2105,9 @@ struct drm_mode_config {
 	struct drm_property *rotation_property;
 	struct drm_property *zpos_property;
 	struct drm_property *zpos_immutable_property;
+	struct drm_property *blending_property;
+	struct drm_property *alpha_property;
+	struct drm_property *alpha_premult_property;
 	struct drm_property *prop_src_x;
 	struct drm_property *prop_src_y;
 	struct drm_property *prop_src_w;
@@ -2510,6 +2518,13 @@ extern int drm_mode_create_zpos_property(struct drm_device *dev,
 extern int drm_mode_create_zpos_immutable_property(struct drm_device *dev,
 						   unsigned int min,
 						   unsigned int max);
+
+extern int drm_mode_create_blending_property(struct drm_device *dev,
+				      unsigned int *supported_blendings,
+				      unsigned int supported_blendings_count);
+extern int drm_mode_create_alpha_property(struct drm_device *dev,
+					  unsigned int max);
+extern int drm_mode_create_alpha_premult_property(struct drm_device *dev);
 
 /* Helpers */
 
