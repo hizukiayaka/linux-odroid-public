@@ -42,3 +42,6 @@ int drm_atomic_get_property(struct drm_mode_object *obj,
 int drm_mode_atomic_ioctl(struct drm_device *dev,
 			  void *data, struct drm_file *file_priv);
 
+/* drm_blend.c */
+int drm_atomic_helper_normalize_zpos(struct drm_device *dev,
+				     struct drm_atomic_state *state);
