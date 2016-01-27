@@ -1110,6 +1110,22 @@ int max_width, max_height;</synopsis>
     </sect2>
   </sect1>
 
+  <!-- Internals: plane blending -->
+
+  <sect1 id="drm-plane-blending">
+    <title>Plane blending</title>
+
+    <sect2>
+      <title>Plane Blending Overview</title>
+!Pinclude/uapi/drm/drm_mode.h Generic plane blending operation
+    </sect2>
+    <sect2>
+      <title>Blending Function Reference</title>
+!Iinclude/uapi/drm/drm_mode.h
+!Edrivers/gpu/drm/drm_blend.c
+    </sect2>
+  </sect1>
+
   <!-- Internals: kms initialization and cleanup -->
 
   <sect1 id="drm-kms-init">
@@ -1822,7 +1838,7 @@ void intel_crt_init(struct drm_device *dev)
 	<td valign="top" >Description/Restrictions</td>
 	</tr>
 	<tr>
-	<td rowspan="43" valign="top" >DRM</td>
+	<td rowspan="46" valign="top" >DRM</td>
 	<td valign="top" >Generic</td>
 	<td valign="top" >“rotation”</td>
 	<td valign="top" >BITMASK</td>
@@ -2074,7 +2090,7 @@ void intel_crt_init(struct drm_device *dev)
 	<td valign="top" >property to suggest an Y offset for a connector</td>
 	</tr>
 	<tr>
-	<td rowspan="9" valign="top" >Optional</td>
+	<td rowspan="12" valign="top" >Optional</td>
 	<td valign="top" >“scaling mode”</td>
 	<td valign="top" >ENUM</td>
 	<td valign="top" >{ "None", "Full", "Center", "Full aspect" }</td>
@@ -2161,6 +2177,33 @@ void intel_crt_init(struct drm_device *dev)
 		If two planes assigned to same CRTC have equal zpos values, the plane with higher plane
 		id is treated as closer to front. Can be IMMUTABLE if driver doesn't support changing
 		planes' order. Exact value range is driver dependent.</td>
+	</tr>
+	<tr>
+	<td valign="top" > "alpha" </td>
+	<td valign="top" >RANGE</td>
+	<td valign="top" >Min=0, Max= driver dependent</td>
+	<td valign="top" >Plane</td>
+	<td valign="top" >Plane's alpha value (transparency) for blending operation. Used in some blending modes. </td>
+	</tr>
+	<tr>
+	<td valign="top" > "alpha_premult" </td>
+	<td valign="top" >BOOL</td>
+	<td valign="top" >Min=0, Max=1</td>
+	<td valign="top" >Plane</td>
+	<td valign="top" >Indicates the range of the RGB data of the framebuffer attached to the given plane.
+		When enabled, RGB values fits the range from 0 to pixel's alpha value. When disabled, RGB
+		values are from 0 to 255 range and during blending operations they will be multiplied by
+		the pixel's alpha value first before computing result of blending equations. Value of this
+		property is used in some blending modes and only when user attaches framebuffer with pixel
+		format, which contains non-binary alpha channel.</td>
+	</tr>
+	<tr>
+	<td valign="top" > "blending" </td>
+	<td valign="top" >ENUM</td>
+	<td valign="top" >{ "disabled", "pixel-alpha", "const-alpha" "pixel-const-alpha" }</td>
+	<td valign="top" >Plane</td>
+	<td valign="top" >Selects algorithm used in plane blending operation. For more information, see
+		DRM_BLEND_* symbolic constant documentation. </td>
 	</tr>
 	<tr>
 	<td rowspan="20" valign="top" >i915</td>
