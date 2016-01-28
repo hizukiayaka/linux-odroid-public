@@ -188,12 +188,33 @@ static int
 exynos_drm_plane_check_format(const struct exynos_drm_plane_config *config,
 			      struct exynos_drm_plane_state *state)
 {
+	struct drm_framebuffer *fb = state->base.fb;
+
 	uint32_t format = EXYNOS_BAD_PIXEL_FORMAT;
 	int i;
 
+	switch (fb->modifier[0]) {
+	case DRM_FORMAT_MOD_SAMSUNG_64_32_TILE:
+		if (!(config->capabilities & EXYNOS_DRM_PLANE_CAP_TILE))
+			return -ENOTSUPP;
+
+		if (fb->modifier[0] != fb->modifier[1]) {
+			DRM_ERROR("heterogenous pixel format modifier not supported");
+			return -ENOTSUPP;
+		}
+		break;
+
+	case 0:
+		break;
+
+	default:
+		DRM_ERROR("unsupported pixel format modifier");
+		return -ENOTSUPP;
+	}
+
 	for (i = 0; i < config->num_pixel_formats; i++)
-		if (config->pixel_formats[i] == state->base.fb->pixel_format)
-			format = state->base.fb->pixel_format;
+		if (config->pixel_formats[i] == fb->pixel_format)
+			format = fb->pixel_format;
 
 	if (format == EXYNOS_BAD_PIXEL_FORMAT) {
 		DRM_DEBUG_KMS("unsupported pixel format");

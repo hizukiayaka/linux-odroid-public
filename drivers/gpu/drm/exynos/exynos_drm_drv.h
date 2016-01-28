@@ -105,6 +105,7 @@ struct exynos_drm_plane {
 #define EXYNOS_DRM_PLANE_CAP_PLANE_ALPHA	(1 << 3)
 #define EXYNOS_DRM_PLANE_CAP_PREMULT_ALPHA	(1 << 4)
 #define EXYNOS_DRM_PLANE_CAP_BLENDING	(1 << 5)
+#define EXYNOS_DRM_PLANE_CAP_TILE	(1 << 6)
 
 /*
  * Exynos DRM plane configuration structure.
