@@ -208,4 +208,6 @@ void exynos_drm_mode_config_init(struct drm_device *dev)
 	dev->mode_config.max_height = 4096;
 
 	dev->mode_config.funcs = &exynos_drm_mode_config_funcs;
+
+	dev->mode_config.allow_fb_modifiers = true;
 }
