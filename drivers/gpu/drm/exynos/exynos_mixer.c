@@ -505,6 +505,14 @@ static void mixer_stop(struct mixer_context *ctx)
 		usleep_range(10000, 12000);
 }
 
+static bool vp_is_tiled(struct drm_framebuffer *fb)
+{
+	if (fb->modifier[1] == DRM_FORMAT_MOD_SAMSUNG_64_32_TILE)
+		return true;
+
+	return false;
+}
+
 static void vp_video_buffer(struct mixer_context *ctx,
 			    struct exynos_drm_plane *plane)
 {
@@ -531,6 +539,8 @@ static void vp_video_buffer(struct mixer_context *ctx,
 				fb->pixel_format);
 		return;
 	}
+
+	tiled_mode = vp_is_tiled(fb);
 
 	luma_addr[0] = exynos_drm_fb_dma_addr(fb, 0);
 	chroma_addr[0] = exynos_drm_fb_dma_addr(fb, 1);
