@@ -6,3 +6,4 @@
 [PATCH 0/7] drm/exynos/hdmi: add Exynos5433 support
 [PATCH 0/7] drm/exynos: HDMI and DECON fixes and enhancements
 [PATCH 0/6] drm/exynos: add pipeline clock support
+[PATCH v5 0/5] drm/exynos: introduce generic zpos and blending properties
