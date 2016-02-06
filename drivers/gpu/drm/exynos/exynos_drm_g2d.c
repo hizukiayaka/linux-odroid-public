@@ -63,6 +63,24 @@
 #define G2D_PAT_BASE_ADDR		0x0500
 #define G2D_MSK_BASE_ADDR		0x0520
 
+/* third operand register */
+#define G2D_THIRD_OPERAND_REG		0x0610
+#define G2D_THIRD_OP_MASK_ALL		0x0033
+#define G2D_THIRD_OP_MASK_UNMASKED	0x0003
+#define G2D_THIRD_OP_MASK_MASKED	0x0030
+#define G2D_THIRD_OP_SEL_PAT		0x0
+#define G2D_THIRD_OP_SEL_FG		0x1
+#define G2D_THIRD_OP_SEL_BG		0x2
+
+/*
+ * color registers:
+ * foreground, background, bluescreen, solidfill
+ */
+#define G2D_FG_COLOR_REG			0x0700
+#define G2D_BG_COLOR_REG			0x0704
+#define G2D_BS_COLOR_REG			0x0708
+#define G2D_SF_COLOR_REG			0x070C
+
 /* G2D_SOFT_RESET */
 #define G2D_SFRCLEAR			(1 << 1)
 #define G2D_R				(1 << 0)
@@ -152,6 +170,13 @@ enum g2d_reg_type {
 	MAX_REG_TYPE_NR
 };
 
+enum g2d_cmdlist_node_flags {
+	NODE_HAS_FG_COLOR = (1 << 0),
+	NODE_HAS_BG_COLOR = (1 << 1),
+	NODE_HAS_BS_COLOR = (1 << 2),
+	NODE_HAS_SF_COLOR = (1 << 3)
+};
+
 /* cmdlist data structure */
 struct g2d_cmdlist {
 	u32		head;
@@ -219,6 +244,7 @@ struct g2d_cmdlist_node {
 	struct g2d_cmdlist	*cmdlist;
 	dma_addr_t		dma_addr;
 	struct g2d_buf_info	buf_info;
+	unsigned int flags;
 
 	struct drm_exynos_pending_g2d_event	*event;
 };
@@ -839,6 +865,36 @@ static unsigned long g2d_get_buf_bpp(unsigned int format)
 	return bpp;
 }
 
+static unsigned int g2d_get_color_reg_flag(int reg_offset)
+{
+	/*
+	 * Assume that we only receive arguments of the type:
+	 * G2D_FG_COLOR_REG = 0x0700,
+	 * G2D_BG_COLOR_REG = 0x0704,
+	 * G2D_BS_COLOR_REG = 0x0708,
+	 * G2D_SF_COLOR_REG = 0x070C
+	 */
+	return (1 << ((reg_offset - G2D_FG_COLOR_REG) / 4));
+}
+
+static bool g2d_check_third_op_reg(unsigned long value, unsigned int flags)
+{
+	/* Don't accept masked select for now. */
+	if (value & G2D_THIRD_OP_MASK_MASKED)
+		return false;
+
+	switch (value & G2D_THIRD_OP_MASK_UNMASKED) {
+	case G2D_THIRD_OP_SEL_FG:
+		return (flags & NODE_HAS_FG_COLOR);
+	case G2D_THIRD_OP_SEL_BG:
+		return (flags & NODE_HAS_BG_COLOR);
+	/* Pattern are not implemented yet. */
+	case G2D_THIRD_OP_SEL_PAT:
+	default:
+		return false;
+	}
+}
+
 static bool g2d_check_buf_desc_is_valid(struct g2d_buf_desc *buf_desc,
 						enum g2d_reg_type reg_type,
 						unsigned long size)
@@ -1240,6 +1296,26 @@ static int g2d_check_reg_offset(struct device *dev,
 			buf_desc->right_x = value & 0x1fff;
 			buf_desc->bottom_y = (value & 0x1fff0000) >> 16;
 			break;
+		case G2D_FG_COLOR_REG:
+		case G2D_BG_COLOR_REG:
+		case G2D_BS_COLOR_REG:
+		case G2D_SF_COLOR_REG:
+			if (unlikely(for_addr))
+				goto err;
+
+			node->flags |= g2d_get_color_reg_flag(reg_offset);
+			break;
+		case G2D_THIRD_OPERAND_REG:
+			if (unlikely(for_addr))
+				goto err;
+
+			value = cmdlist->data[index + 1];
+			if (value & ~G2D_THIRD_OP_MASK_ALL)
+				goto err;
+
+			if (!g2d_check_third_op_reg(value, node->flags))
+				goto err;
+			break;
 		default:
 			if (unlikely(for_addr))
 				goto err;
@@ -1313,6 +1389,7 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
 		return -ENOMEM;
 
 	node->event = NULL;
+	node->flags = 0;
 
 	if (req->event_type != G2D_EVENT_NOT) {
 		spin_lock_irqsave(&drm_dev->event_lock, flags);
