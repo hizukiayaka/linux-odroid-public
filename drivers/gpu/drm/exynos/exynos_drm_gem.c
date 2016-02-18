@@ -65,7 +65,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
 		return -ENOMEM;
 	}
 
-	exynos_gem->cookie = dma_alloc_attrs(dev->dev, exynos_gem->size,
+	exynos_gem->cookie = dma_alloc_attrs(to_dma_dev(dev), exynos_gem->size,
 					     &exynos_gem->dma_addr, GFP_KERNEL,
 					     &exynos_gem->dma_attrs);
 	if (!exynos_gem->cookie) {
@@ -73,7 +73,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
 		goto err_free;
 	}
 
-	ret = dma_get_sgtable_attrs(dev->dev, &sgt, exynos_gem->cookie,
+	ret = dma_get_sgtable_attrs(to_dma_dev(dev), &sgt, exynos_gem->cookie,
 				    exynos_gem->dma_addr, exynos_gem->size,
 				    &exynos_gem->dma_attrs);
 	if (ret < 0) {
@@ -98,7 +98,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
 err_sgt_free:
 	sg_free_table(&sgt);
 err_dma_free:
-	dma_free_attrs(dev->dev, exynos_gem->size, exynos_gem->cookie,
+	dma_free_attrs(to_dma_dev(dev), exynos_gem->size, exynos_gem->cookie,
 		       exynos_gem->dma_addr, &exynos_gem->dma_attrs);
 err_free:
 	drm_free_large(exynos_gem->pages);
@@ -118,7 +118,7 @@ static void exynos_drm_free_buf(struct exynos_drm_gem *exynos_gem)
 	DRM_DEBUG_KMS("dma_addr(0x%lx), size(0x%lx)\n",
 			(unsigned long)exynos_gem->dma_addr, exynos_gem->size);
 
-	dma_free_attrs(dev->dev, exynos_gem->size, exynos_gem->cookie,
+	dma_free_attrs(to_dma_dev(dev), exynos_gem->size, exynos_gem->cookie,
 			(dma_addr_t)exynos_gem->dma_addr,
 			&exynos_gem->dma_attrs);
 
@@ -297,7 +297,7 @@ static int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem *exynos_gem,
 	if (vm_size > exynos_gem->size)
 		return -EINVAL;
 
-	ret = dma_mmap_attrs(drm_dev->dev, vma, exynos_gem->cookie,
+	ret = dma_mmap_attrs(to_dma_dev(drm_dev), vma, exynos_gem->cookie,
 			     exynos_gem->dma_addr, exynos_gem->size,
 			     &exynos_gem->dma_attrs);
 	if (ret < 0) {

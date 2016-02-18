@@ -29,9 +29,8 @@ void drm_iommu_detach_device(struct drm_device *dev_dev,
 
 static inline bool is_drm_iommu_supported(struct drm_device *drm_dev)
 {
-	struct device *dev = drm_dev->dev;
-
-	return dev->archdata.mapping ? true : false;
+	struct exynos_drm_private *priv = drm_dev->dev_private;
+	return priv->mapping ? true : false;
 }
 
 #else
