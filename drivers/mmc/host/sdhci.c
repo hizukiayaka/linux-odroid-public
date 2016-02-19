@@ -1275,6 +1275,7 @@ void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 		case MMC_VDD_165_195:
 			pwr = SDHCI_POWER_180;
 			break;
+		case MMC_VDD_28_29:
 		case MMC_VDD_29_30:
 		case MMC_VDD_30_31:
 			pwr = SDHCI_POWER_300;
