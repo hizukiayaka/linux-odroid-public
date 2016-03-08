@@ -1158,16 +1158,13 @@ static int g2d_check_reg_offset(struct device *dev,
 {
 	struct g2d_cmdlist *cmdlist = node->cmdlist;
 	int reg_offset;
-	int index;
-	int i;
+	u32 index;
 
-	for (i = 0; i < nr; i++) {
+	for (index = cmdlist->last - 2 * nr; index < cmdlist->last; index += 2) {
 		struct g2d_buf_info *buf_info = &node->buf_info;
 		struct g2d_buf_desc *buf_desc;
 		enum g2d_reg_type reg_type;
 		unsigned long value;
-
-		index = cmdlist->last - 2 * (i + 1);
 
 		reg_offset = cmdlist->data[index] & ~0xfffff000;
 		if (unlikely(reg_offset < G2D_VALID_START ||
