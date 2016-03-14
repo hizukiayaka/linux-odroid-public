@@ -43,8 +43,10 @@ static int devfreq_passive_get_target_freq(struct devfreq *passive,
 	 */
 	if (parent_devfreq->previous_freq > *freq) {
 		struct dev_pm_opp *opp;
+		rcu_read_lock();
 		opp = devfreq_recommended_opp(parent_devfreq->dev.parent,
 						freq, 0);
+		rcu_read_unlock();
 		if (IS_ERR_OR_NULL(opp))
 			return PTR_ERR(opp);
 	}
