@@ -113,6 +113,10 @@ static int device_opp_debug_create_link(struct device_list_opp *list_dev,
 
 	opp_set_dev_name(list_dev->dev, name);
 
+	/* Don't try to create cyclic links. */
+	if (!strcmp(name, dev_opp->dentry_name))
+		return 0;
+
 	/* Create device specific directory link */
 	d = debugfs_create_symlink(name, rootdir, dev_opp->dentry_name);
 	if (!d) {
