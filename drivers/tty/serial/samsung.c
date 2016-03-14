@@ -1267,6 +1267,8 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
 
 		s3c24xx_serial_setsource(port, clk_sel);
 
+		clk_prepare_enable(clk);
+
 		if (!IS_ERR(ourport->baudclk)) {
 			clk_disable_unprepare(ourport->baudclk);
 			ourport->baudclk = ERR_PTR(-EINVAL);
