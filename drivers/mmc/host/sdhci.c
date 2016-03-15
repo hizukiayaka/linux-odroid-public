@@ -1270,6 +1270,16 @@ void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
 {
 	u8 pwr = 0;
 
+	/*
+	 * Ignore the case when vdd is zero and the host is powered down.
+	 * The vdd member of the ios struct is properly initialized in
+	 * mmc_power_up(), but due to pm_runtime it can happen that
+	 * sdhci_set_power() is called before that initialization
+	 * takes places.
+	 */
+	if (!host->pwr && !vdd)
+		return;
+
 	if (mode != MMC_POWER_OFF) {
 		switch (1 << vdd) {
 		case MMC_VDD_165_195:
