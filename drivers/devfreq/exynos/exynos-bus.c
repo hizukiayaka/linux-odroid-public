@@ -276,6 +276,7 @@ static int exynos_bus_parent_parse_of(struct device_node *np,
 	ret = regulator_enable(bus->regulator);
 	if (ret < 0) {
 		dev_err(dev, "failed to enable VDD regulator\n");
+		devm_regulator_put(bus->regulator);
 		return ret;
 	}
 
@@ -323,6 +324,7 @@ static int exynos_bus_parent_parse_of(struct device_node *np,
 
 err_regulator:
 	regulator_disable(bus->regulator);
+	devm_regulator_put(bus->regulator);
 
 	return ret;
 }
@@ -372,6 +374,16 @@ err_opp:
 	dev_pm_opp_of_remove_table(dev);
 
 	return ret;
+}
+
+/* Counterpart to exynos_bus_parse_of(). */
+static void exynos_bus_free_of(struct exynos_bus *bus)
+{
+	struct device *dev = bus->dev;
+
+	dev_pm_opp_of_remove_table(dev);
+	clk_disable_unprepare(bus->clk);
+	devm_clk_put(dev, bus->clk);
 }
 
 static int exynos_bus_probe(struct platform_device *pdev)
@@ -459,6 +471,7 @@ static int exynos_bus_probe(struct platform_device *pdev)
 	}
 
 	goto out;
+
 passive:
 	/* Initalize the struct profile and governor data for passive device */
 	profile->target = exynos_bus_passive_target;
@@ -470,9 +483,8 @@ passive:
 
 	/* Get the instance of parent devfreq device */
 	parent_devfreq = devfreq_get_devfreq_by_phandle(dev, 0);
-	if (IS_ERR(parent_devfreq)) {
-		return -EPROBE_DEFER;
-	}
+	if (IS_ERR(parent_devfreq))
+		goto defer;
 	passive_data->parent = parent_devfreq;
 
 	/* Add devfreq device for exynos bus with passive governor */
@@ -481,7 +493,7 @@ passive:
 	if (IS_ERR_OR_NULL(bus->devfreq)) {
 		dev_err(dev,
 			"failed to add devfreq dev with passive governor\n");
-		return -EPROBE_DEFER;
+		goto defer;
 	}
 
 out:
@@ -496,6 +508,11 @@ out:
 			dev_name(dev), min_freq, max_freq);
 
 	return 0;
+
+defer:
+	exynos_bus_free_of(bus);
+
+	return -EPROBE_DEFER;
 }
 
 #ifdef CONFIG_PM_SLEEP
