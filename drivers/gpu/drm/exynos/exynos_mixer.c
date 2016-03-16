@@ -95,6 +95,7 @@ struct mixer_context {
 	struct drm_device	*drm_dev;
 	struct exynos_drm_crtc	*crtc;
 	struct exynos_drm_plane	planes[MIXER_WIN_NR];
+	unsigned long		state_cache;
 	int			pipe;
 	unsigned long		flags;
 	bool			interlace;
@@ -419,35 +420,69 @@ static void mixer_cfg_rgb_fmt(struct mixer_context *ctx, unsigned int height)
 	mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_RGB_FMT_MASK);
 }
 
-static void mixer_cfg_layer(struct mixer_context *ctx, unsigned int win,
-			    unsigned int priority, bool enable)
+static void mixer_cfg_layer(struct mixer_context *ctx)
 {
 	struct mixer_resources *res = &ctx->mixer_res;
-	u32 val = enable ? ~0 : 0;
+	unsigned int win;
 
-	switch (win) {
-	case 0:
-		mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_GRP0_ENABLE);
-		mixer_reg_writemask(res, MXR_LAYER_CFG,
+	struct exynos_drm_plane_state *state;
+	struct drm_framebuffer *fb;
+	unsigned int priority;
+	bool enable;
+	u32 val;
+
+	for (win = 0; win < MIXER_WIN_NR; ++win) {
+		state = to_exynos_plane_state(ctx->planes[win].base.state);
+		fb = state->fb;
+
+		priority = state->base.normalized_zpos + 1;
+		enable = test_bit(win, &ctx->state_cache);
+		val = enable ? ~0 : 0;
+
+		switch (win) {
+		case 0:
+			mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_GRP0_ENABLE);
+			mixer_reg_writemask(res, MXR_LAYER_CFG,
 				    MXR_LAYER_CFG_GRP0_VAL(priority),
 				    MXR_LAYER_CFG_GRP0_MASK);
-		break;
-	case 1:
-		mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_GRP1_ENABLE);
-		mixer_reg_writemask(res, MXR_LAYER_CFG,
+			break;
+
+		case 1:
+			mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_GRP1_ENABLE);
+			mixer_reg_writemask(res, MXR_LAYER_CFG,
 				    MXR_LAYER_CFG_GRP1_VAL(priority),
 				    MXR_LAYER_CFG_GRP1_MASK);
-		break;
-	case VP_DEFAULT_WIN:
-		if (ctx->vp_enabled) {
+			break;
+
+		case VP_DEFAULT_WIN:
+			if (!ctx->vp_enabled)
+				continue;
+
 			vp_reg_writemask(res, VP_ENABLE, val, VP_ENABLE_ON);
 			mixer_reg_writemask(res, MXR_CFG, val,
 				MXR_CFG_VP_ENABLE);
 			mixer_reg_writemask(res, MXR_LAYER_CFG,
 					    MXR_LAYER_CFG_VP_VAL(priority),
 					    MXR_LAYER_CFG_VP_MASK);
+			break;
 		}
-		break;
+
+		if (!enable || !fb)
+			continue;
+
+		/*
+		 * TODO: Don't enable alpha blending for the bottom window.
+		 */
+		switch (win) {
+		case 0:
+		case 1:
+			mixer_cfg_gfx_blend(ctx, win, is_alpha_format(fb->pixel_format));
+			break;
+
+		case VP_DEFAULT_WIN:
+			mixer_cfg_vp_blend(ctx);
+			break;
+		}
 	}
 }
 
@@ -478,7 +513,6 @@ static void vp_video_buffer(struct mixer_context *ctx,
 	struct drm_display_mode *mode = &state->base.crtc->state->adjusted_mode;
 	struct mixer_resources *res = &ctx->mixer_res;
 	struct drm_framebuffer *fb = state->fb;
-	unsigned int priority = state->base.normalized_zpos + 1;
 	unsigned long flags;
 	dma_addr_t luma_addr[2], chroma_addr[2];
 	bool tiled_mode = false;
@@ -563,8 +597,6 @@ static void vp_video_buffer(struct mixer_context *ctx,
 
 	mixer_cfg_scan(ctx, mode->vdisplay);
 	mixer_cfg_rgb_fmt(ctx, mode->vdisplay);
-	mixer_cfg_layer(ctx, plane->index, priority, true);
-	mixer_cfg_vp_blend(ctx);
 	mixer_run(ctx);
 
 	spin_unlock_irqrestore(&res->reg_slock, flags);
@@ -588,7 +620,6 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
 	struct drm_display_mode *mode = &state->base.crtc->state->adjusted_mode;
 	struct mixer_resources *res = &ctx->mixer_res;
 	struct drm_framebuffer *fb = state->fb;
-	unsigned int priority = state->base.normalized_zpos + 1;
 	unsigned long flags;
 	unsigned int win = plane->index;
 	unsigned int x_ratio = 0, y_ratio = 0;
@@ -680,8 +711,6 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
 
 	mixer_cfg_scan(ctx, mode->vdisplay);
 	mixer_cfg_rgb_fmt(ctx, mode->vdisplay);
-	mixer_cfg_layer(ctx, win, priority, true);
-	mixer_cfg_gfx_blend(ctx, win, is_alpha_format(fb->pixel_format));
 
 	/* layer update mandatory for mixer 16.0.33.0 */
 	if (ctx->mxr_ver == MXR_VER_16_0_33_0 ||
@@ -1000,31 +1029,35 @@ static void mixer_update_plane(struct exynos_drm_crtc *crtc,
 		vp_video_buffer(mixer_ctx, plane);
 	else
 		mixer_graph_buffer(mixer_ctx, plane);
+
+	__set_bit(plane->index, &mixer_ctx->state_cache);
 }
 
 static void mixer_disable_plane(struct exynos_drm_crtc *crtc,
 				struct exynos_drm_plane *plane)
 {
 	struct mixer_context *mixer_ctx = crtc->ctx;
-	struct mixer_resources *res = &mixer_ctx->mixer_res;
-	unsigned long flags;
 
 	DRM_DEBUG_KMS("win: %d\n", plane->index);
 
 	if (!test_bit(MXR_BIT_POWERED, &mixer_ctx->flags))
 		return;
 
-	spin_lock_irqsave(&res->reg_slock, flags);
-	mixer_cfg_layer(mixer_ctx, plane->index, 0, false);
-	spin_unlock_irqrestore(&res->reg_slock, flags);
+	__clear_bit(plane->index, &mixer_ctx->state_cache);
 }
 
 static void mixer_atomic_flush(struct exynos_drm_crtc *crtc)
 {
 	struct mixer_context *mixer_ctx = crtc->ctx;
+	struct mixer_resources *res = &mixer_ctx->mixer_res;
+	unsigned long flags;
 
 	if (!test_bit(MXR_BIT_POWERED, &mixer_ctx->flags))
 		return;
+
+	spin_lock_irqsave(&res->reg_slock, flags);
+	mixer_cfg_layer(mixer_ctx);
+	spin_unlock_irqrestore(&res->reg_slock, flags);
 
 	mixer_vsync_set_update(mixer_ctx, true);
 }
