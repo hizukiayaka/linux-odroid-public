@@ -77,6 +77,9 @@ enum mixer_version_id {
 enum mixer_flag_bits {
 	MXR_BIT_POWERED,
 	MXR_BIT_VSYNC,
+	MXR_BIT_INTERLACE,
+	MXR_BIT_VP_ENABLED,
+	MXR_BIT_HAS_SCLK,
 };
 
 static const uint32_t mixer_formats[] = {
@@ -106,9 +109,6 @@ struct mixer_context {
 	u32			layer_state;
 	int			pipe;
 	unsigned long		flags;
-	bool			interlace;
-	bool			vp_enabled;
-	bool			has_sclk;
 
 	struct mixer_resources	mixer_res;
 	enum mixer_version_id	mxr_ver;
@@ -494,7 +494,7 @@ static void mixer_vsync_set_update(struct mixer_context *ctx, bool enable)
 	mixer_reg_writemask(res, MXR_STATUS, enable ?
 			MXR_STATUS_SYNC_ENABLE : 0, MXR_STATUS_SYNC_ENABLE);
 
-	if (ctx->vp_enabled)
+	if (test_bit(MXR_BIT_VP_ENABLED, &ctx->flags))
 		vp_reg_write(res, VP_SHADOW_UPDATE, enable ?
 			VP_SHADOW_UPDATE_ENABLE : 0);
 }
@@ -505,8 +505,8 @@ static void mixer_cfg_scan(struct mixer_context *ctx, unsigned int height)
 	u32 val;
 
 	/* choosing between interlace and progressive mode */
-	val = (ctx->interlace ? MXR_CFG_SCAN_INTERLACE :
-				MXR_CFG_SCAN_PROGRESSIVE);
+	val = test_bit(MXR_BIT_INTERLACE, &ctx->flags) ?
+		MXR_CFG_SCAN_INTERLACE : MXR_CFG_SCAN_PROGRESSIVE;
 
 	if (ctx->mxr_ver != MXR_VER_128_0_0_184) {
 		/* choosing between proper HD and SD mode */
@@ -589,7 +589,7 @@ static void mixer_cfg_layer(struct mixer_context *ctx, unsigned int win,
 		mixer_reg_writemask(res, MXR_CFG, val, MXR_CFG_GRP1_ENABLE);
 		break;
 	case 2:
-		if (ctx->vp_enabled) {
+		if (test_bit(MXR_BIT_VP_ENABLED, &ctx->flags)) {
 			vp_reg_writemask(res, VP_ENABLE, val, VP_ENABLE_ON);
 			mixer_reg_writemask(res, MXR_CFG, val,
 				MXR_CFG_VP_ENABLE);
@@ -660,7 +660,7 @@ static void vp_video_buffer(struct mixer_context *ctx,
 	chroma_addr[0] = exynos_drm_fb_dma_addr(fb, 1);
 
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
-		ctx->interlace = true;
+		__set_bit(MXR_BIT_INTERLACE, &ctx->flags);
 		if (tiled_mode) {
 			luma_addr[1] = luma_addr[0] + 0x40;
 			chroma_addr[1] = chroma_addr[0] + 0x40;
@@ -669,7 +669,7 @@ static void vp_video_buffer(struct mixer_context *ctx,
 			chroma_addr[1] = chroma_addr[0] + fb->pitches[0];
 		}
 	} else {
-		ctx->interlace = false;
+		__clear_bit(MXR_BIT_INTERLACE, &ctx->flags);
 		luma_addr[1] = 0;
 		chroma_addr[1] = 0;
 	}
@@ -678,7 +678,7 @@ static void vp_video_buffer(struct mixer_context *ctx,
 	mixer_vsync_set_update(ctx, false);
 
 	/* interlace or progressive scan mode */
-	val = (ctx->interlace ? ~0 : 0);
+	val = (test_bit(MXR_BIT_INTERLACE, &ctx->flags) ? ~0 : 0);
 	vp_reg_writemask(res, VP_MODE, val, VP_MODE_LINE_SKIP);
 
 	/* setup format */
@@ -701,7 +701,7 @@ static void vp_video_buffer(struct mixer_context *ctx,
 
 	vp_reg_write(res, VP_DST_WIDTH, state->crtc.w);
 	vp_reg_write(res, VP_DST_H_POSITION, state->crtc.x);
-	if (ctx->interlace) {
+	if (test_bit(MXR_BIT_INTERLACE, &ctx->flags)) {
 		vp_reg_write(res, VP_DST_HEIGHT, state->crtc.h / 2);
 		vp_reg_write(res, VP_DST_V_POSITION, state->crtc.y / 2);
 	} else {
@@ -795,9 +795,9 @@ static void mixer_graph_buffer(struct mixer_context *ctx,
 	src_y_offset = 0;
 
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
-		ctx->interlace = true;
+		__set_bit(MXR_BIT_INTERLACE, &ctx->flags);
 	else
-		ctx->interlace = false;
+		__clear_bit(MXR_BIT_INTERLACE, &ctx->flags);
 
 	spin_lock_irqsave(&res->reg_slock, flags);
 	mixer_vsync_set_update(ctx, false);
@@ -893,7 +893,7 @@ static void mixer_win_reset(struct mixer_context *ctx)
 	mixer_reg_write(res, MXR_BG_COLOR1, 0x008080);
 	mixer_reg_write(res, MXR_BG_COLOR2, 0x008080);
 
-	if (ctx->vp_enabled) {
+	if (test_bit(MXR_BIT_VP_ENABLED, &ctx->flags)) {
 		/* configuration of Video Processor Registers */
 		vp_win_reset(ctx);
 		vp_default_filter(res);
@@ -902,7 +902,7 @@ static void mixer_win_reset(struct mixer_context *ctx)
 	/* disable all layers */
 	mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_GRP0_ENABLE);
 	mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_GRP1_ENABLE);
-	if (ctx->vp_enabled)
+	if (test_bit(MXR_BIT_VP_ENABLED, &ctx->flags))
 		mixer_reg_writemask(res, MXR_CFG, 0, MXR_CFG_VP_ENABLE);
 
 	mixer_vsync_set_update(ctx, true);
@@ -928,7 +928,7 @@ static irqreturn_t mixer_irq_handler(int irq, void *arg)
 		val &= ~MXR_INT_STATUS_VSYNC;
 
 		/* interlace scan need to check shadow register */
-		if (ctx->interlace) {
+		if (test_bit(MXR_BIT_INTERLACE, &ctx->flags)) {
 			base = mixer_reg_read(res, MXR_GRAPHIC_BASE(0));
 			shadow = mixer_reg_read(res, MXR_GRAPHIC_BASE_S(0));
 			if (base != shadow)
@@ -1034,7 +1034,7 @@ static int vp_resources_init(struct mixer_context *mixer_ctx)
 		return -ENODEV;
 	}
 
-	if (mixer_ctx->has_sclk) {
+	if (test_bit(MXR_BIT_HAS_SCLK, &mixer_ctx->flags)) {
 		mixer_res->sclk_mixer = devm_clk_get(dev, "sclk_mixer");
 		if (IS_ERR(mixer_res->sclk_mixer)) {
 			dev_err(dev, "failed to get clock 'sclk_mixer'\n");
@@ -1084,7 +1084,7 @@ static int mixer_initialize(struct mixer_context *mixer_ctx,
 		return ret;
 	}
 
-	if (mixer_ctx->vp_enabled) {
+	if (test_bit(MXR_BIT_VP_ENABLED, &mixer_ctx->flags)) {
 		/* acquire vp resources: regs, irqs, clocks */
 		ret = vp_resources_init(mixer_ctx);
 		if (ret) {
@@ -1401,8 +1401,6 @@ static int mixer_probe(struct platform_device *pdev)
 
 	ctx->pdev = pdev;
 	ctx->dev = dev;
-	ctx->vp_enabled = drv->is_vp_enabled;
-	ctx->has_sclk = drv->has_sclk;
 	ctx->mxr_ver = drv->version;
 
 	if (drv->is_vp_enabled) {
@@ -1412,6 +1410,11 @@ static int mixer_probe(struct platform_device *pdev)
 		ctx->layer_cfg = nonvp_default_cfg;
 		ctx->num_layer = ARRAY_SIZE(nonvp_default_cfg);
 	}
+
+	if (drv->is_vp_enabled)
+		__set_bit(MXR_BIT_VP_ENABLED, &ctx->flags);
+	if (drv->has_sclk)
+		__set_bit(MXR_BIT_HAS_SCLK, &ctx->flags);
 
 	init_waitqueue_head(&ctx->wait_vsync_queue);
 	atomic_set(&ctx->wait_vsync_event, 0);
@@ -1442,9 +1445,9 @@ static int exynos_mixer_suspend(struct device *dev)
 
 	clk_disable_unprepare(res->hdmi);
 	clk_disable_unprepare(res->mixer);
-	if (ctx->vp_enabled) {
+	if (test_bit(MXR_BIT_VP_ENABLED, &ctx->flags)) {
 		clk_disable_unprepare(res->vp);
-		if (ctx->has_sclk)
+		if (test_bit(MXR_BIT_HAS_SCLK, &ctx->flags))
 			clk_disable_unprepare(res->sclk_mixer);
 	}
 
@@ -1467,14 +1470,14 @@ static int exynos_mixer_resume(struct device *dev)
 		DRM_ERROR("Failed to prepare_enable the hdmi clk [%d]\n", ret);
 		return ret;
 	}
-	if (ctx->vp_enabled) {
+	if (test_bit(MXR_BIT_VP_ENABLED, &ctx->flags)) {
 		ret = clk_prepare_enable(res->vp);
 		if (ret < 0) {
 			DRM_ERROR("Failed to prepare_enable the vp clk [%d]\n",
 				  ret);
 			return ret;
 		}
-		if (ctx->has_sclk) {
+		if (test_bit(MXR_BIT_HAS_SCLK, &ctx->flags)) {
 			ret = clk_prepare_enable(res->sclk_mixer);
 			if (ret < 0) {
 				DRM_ERROR("Failed to prepare_enable the " \
