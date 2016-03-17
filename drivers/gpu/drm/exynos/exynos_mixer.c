@@ -1121,9 +1121,15 @@ static int mixer_atomic_check(struct exynos_drm_crtc *crtc,
 		mode->hdisplay, mode->vdisplay, mode->vrefresh,
 		(mode->flags & DRM_MODE_FLAG_INTERLACE) ? 1 : 0);
 
+	/* Check against resolution ranges. */
 	if ((w >= 464 && w <= 720 && h >= 261 && h <= 576) ||
 		(w >= 1024 && w <= 1280 && h >= 576 && h <= 720) ||
 		(w >= 1664 && w <= 1920 && h >= 936 && h <= 1080))
+		return 0;
+
+	/* Check against some specific resolutions. */
+	if ((w == 1024 && h == 768) ||
+		(w == 1280 && h == 1024))
 		return 0;
 
 	return -EINVAL;
