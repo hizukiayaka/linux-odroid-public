@@ -1714,7 +1714,7 @@ int exynos_g2d_get_ver2_ioctl(struct drm_device *drm_dev, void *data,
 
 	ver->major = G2D_HW_MAJOR_VER;
 	ver->minor = G2D_HW_MINOR_VER;
-	ver->caps = 0;
+	ver->caps = G2D_CAP_CMDLIST2;
 
 	/*
 	 * We can only properly support userptr functionality when
@@ -1724,6 +1724,157 @@ int exynos_g2d_get_ver2_ioctl(struct drm_device *drm_dev, void *data,
 		ver->caps |= G2D_CAP_USERPTR;
 
 	return 0;
+}
+
+int exynos_g2d_set_cmdlist2_ioctl(struct drm_device *drm_dev, void *data,
+				 struct drm_file *file)
+{
+	struct drm_exynos_file_private *file_priv = file->driver_priv;
+	struct exynos_drm_g2d_private *g2d_priv = file_priv->g2d_priv;
+	struct device *dev;
+	struct g2d_data *g2d;
+	struct drm_exynos_g2d_set_cmdlist2 *req = data;
+
+	struct g2d_cmdlist_node *node;
+	struct g2d_cmdlist *cmdlist;
+
+	int size;
+	int ret;
+
+	if (unlikely(!g2d_priv))
+		return -ENODEV;
+
+	dev = g2d_priv->dev;
+	if (unlikely(!dev))
+		return -ENODEV;
+
+	g2d = dev_get_drvdata(dev);
+	if (unlikely(!g2d))
+		return -EFAULT;
+
+	node = g2d_get_cmdlist(g2d);
+	if (unlikely(!node))
+		return -ENOMEM;
+
+	node->event = NULL;
+	node->flags = NODE_SRC_USES_BUFFER;
+
+	cmdlist = node->cmdlist;
+
+	g2d_cmdlist_prolog(cmdlist, node->event);
+
+	/* Check if adding incoming commands exceed the size of the cmdlist. */
+	size = cmdlist->last + req->cmd_base_nr * 2 + req->cmd_nr * 2;
+	if (unlikely(size > G2D_CMDLIST_DATA_NUM)) {
+		dev_err(dev, "cmdlist size is out of bounds\n");
+		ret = -EINVAL;
+		goto err;
+	}
+
+	/* Copy base commands from userspace and validate them. */
+	if (req->cmd_base_nr) {
+		const void __user *cmd;
+
+		cmd = (const void __user *)(unsigned long)req->cmd_base;
+
+		if (unlikely(copy_from_user(cmdlist->data + cmdlist->last,
+					cmd, sizeof(struct drm_exynos_g2d_cmd) *
+					req->cmd_base_nr))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		cmdlist->last += req->cmd_base_nr * 2;
+
+		ret = g2d_validate_base_cmds(dev, node, req->cmd_base_nr);
+		if (unlikely(ret < 0))
+			goto err;
+	} else {
+		dev_err(dev, "no base commands given\n");
+		ret = -EINVAL;
+		goto err;
+	}
+
+	/* Map the buffers that are used by the cmdlist. */
+	ret = g2d_map_cmdlist_buffers(g2d, node, drm_dev, file);
+	if (unlikely(ret < 0))
+		goto err;
+
+	/* The default pattern size is 1x1. */
+	if (node->buf_info[REG_TYPE_PAT].obj)
+		node->buf_info[REG_TYPE_PAT].rect_valid = true;
+
+	if (req->cmd_nr) {
+		const void __user *cmd;
+
+		cmd = (const void __user *)(unsigned long)req->cmd;
+
+		if (unlikely(copy_from_user(cmdlist->data + cmdlist->last,
+					cmd, sizeof(struct drm_exynos_g2d_cmd) *
+					req->cmd_nr))) {
+			ret = -EFAULT;
+			goto err_unmap;
+		}
+		cmdlist->last += req->cmd_nr * 2;
+
+		ret = g2d_validate_cmds(dev, node, req->cmd_nr);
+		if (unlikely(ret < 0))
+			goto err_unmap;
+	} else {
+		dev_err(dev, "no regular commands given\n");
+		ret = -EINVAL;
+		goto err_unmap;
+	}
+
+	/* head */
+	cmdlist->head = cmdlist->last / 2;
+
+	/* tail */
+	cmdlist->data[cmdlist->last] = 0;
+
+	// TODO: factor out event generation
+	if (req->event_type != G2D_EVENT_NOT) {
+		struct drm_exynos_pending_g2d_event *e;
+		unsigned long flags;
+
+		spin_lock_irqsave(&drm_dev->event_lock, flags);
+		if (file->event_space < sizeof(e->event)) {
+			spin_unlock_irqrestore(&drm_dev->event_lock, flags);
+			ret = -ENOMEM;
+			goto err;
+		}
+		file->event_space -= sizeof(e->event);
+		spin_unlock_irqrestore(&drm_dev->event_lock, flags);
+
+		e = kzalloc(sizeof(*node->event), GFP_KERNEL);
+		if (unlikely(!e)) {
+			spin_lock_irqsave(&drm_dev->event_lock, flags);
+			file->event_space += sizeof(e->event);
+			spin_unlock_irqrestore(&drm_dev->event_lock, flags);
+
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		e->event.base.type = DRM_EXYNOS_G2D_EVENT;
+		e->event.base.length = sizeof(e->event);
+		e->event.user_data = req->user_data;
+		e->base.event = &e->event.base;
+		e->base.file_priv = file;
+		e->base.destroy = (void (*) (struct drm_pending_event *)) kfree;
+
+		node->event = e;
+	}
+
+	g2d_add_cmdlist_to_inuse(g2d_priv, node);
+
+	return 0;
+
+err_unmap:
+	g2d_unmap_cmdlist_buffers(g2d, node, file);
+
+err:
+	g2d_put_cmdlist(g2d, node);
+	return ret;
 }
 
 int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
