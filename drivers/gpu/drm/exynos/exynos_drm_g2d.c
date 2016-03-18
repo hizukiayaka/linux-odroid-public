@@ -1222,7 +1222,7 @@ static int g2d_check_reg_offset(struct device *dev,
 		enum g2d_reg_type reg_type;
 		unsigned long value;
 
-		reg_offset = cmdlist->data[index] & ~0xfffff000;
+		reg_offset = cmdlist->data[index] & 0x0fff;
 		if (unlikely(reg_offset < G2D_VALID_START ||
 					reg_offset > G2D_VALID_END))
 			goto err;
@@ -1242,7 +1242,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			reg_type = g2d_get_reg_type(reg_offset);
 
 			/* check userptr buffer type. */
-			if ((cmdlist->data[index] & ~0x7fffffff) >> 31) {
+			if (cmdlist->data[index] & G2D_BUF_USERPTR) {
 				buf_info->types[reg_type] = BUF_TYPE_USERPTR;
 				cmdlist->data[index] &= ~G2D_BUF_USERPTR;
 			} else
@@ -1281,7 +1281,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			value = cmdlist->data[index + 1];
 
 			buf_desc->left_x = value & 0x1fff;
-			buf_desc->top_y = (value & 0x1fff0000) >> 16;
+			buf_desc->top_y = (value >> 16) & 0x1fff;
 			break;
 		case G2D_SRC_RIGHT_BOTTOM:
 		case G2D_DST_RIGHT_BOTTOM:
@@ -1294,7 +1294,7 @@ static int g2d_check_reg_offset(struct device *dev,
 			value = cmdlist->data[index + 1];
 
 			buf_desc->right_x = value & 0x1fff;
-			buf_desc->bottom_y = (value & 0x1fff0000) >> 16;
+			buf_desc->bottom_y = (value >> 16) & 0x1fff;
 			break;
 		case G2D_FG_COLOR_REG:
 		case G2D_BG_COLOR_REG:
