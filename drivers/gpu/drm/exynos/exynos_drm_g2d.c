@@ -1063,6 +1063,90 @@ static irqreturn_t g2d_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static int g2d_validate_base_cmds(struct device *dev,
+				struct g2d_cmdlist_node *node,
+				unsigned int nr)
+{
+	struct g2d_cmdlist *cmdlist = node->cmdlist;
+	unsigned int reg_offset = 0;
+	u32 index;
+
+	for (index = cmdlist->last - 2 * nr; index < cmdlist->last; index += 2) {
+		struct g2d_buf_info *buf_info;
+		enum g2d_reg_type reg_type;
+
+		reg_offset = cmdlist->data[index] & 0x0fff;
+		if (unlikely(reg_offset < G2D_VALID_START ||
+				reg_offset > G2D_VALID_END))
+			goto err;
+		if (unlikely(reg_offset % 4))
+			goto err;
+
+		switch (reg_offset) {
+		case G2D_SRC_BASE_ADDR:
+		case G2D_SRC_PLANE2_BASE_ADDR:
+		case G2D_DST_BASE_ADDR:
+		case G2D_DST_PLANE2_BASE_ADDR:
+		case G2D_PAT_BASE_ADDR:
+		case G2D_MSK_BASE_ADDR:
+			reg_type = g2d_get_reg_type(reg_offset);
+			buf_info = &node->buf_info[reg_type];
+
+			/* check userptr buffer type. */
+			if (cmdlist->data[index] & G2D_BUF_USERPTR) {
+				buf_info->is_userptr = true;
+				cmdlist->data[index] &= ~G2D_BUF_USERPTR;
+			}
+
+			/*
+			 * Store pointer to the current command here, so we can patch
+			 * the buffer handle later in g2d_map_cmdlist_buffers().
+			 */
+			buf_info->data = &cmdlist->data[index];
+			break;
+
+		case G2D_SRC_STRIDE:
+		case G2D_DST_STRIDE:
+		case G2D_PAT_STRIDE:
+		case G2D_MSK_STRIDE:
+			reg_type = g2d_get_reg_type(reg_offset);
+			buf_info = &node->buf_info[reg_type];
+
+			buf_info->stride = cmdlist->data[index + 1] & 0x7fff;
+			break;
+
+		case G2D_SRC_COLOR_MODE:
+		case G2D_DST_COLOR_MODE:
+			reg_type = g2d_get_reg_type(reg_offset);
+			buf_info = &node->buf_info[reg_type];
+
+			buf_info->format = cmdlist->data[index + 1] & 0xf;
+			buf_info->bpp = g2d_get_buf_bpp(buf_info->format);
+			break;
+
+		/*
+		 * TODO:
+		 *  - pattern color is limited to a subset of src/dst color mode
+		 *  - mask mode is different from color mode altogether
+		 */
+		case G2D_PAT_COLOR_MODE:
+		case G2D_MSK_MODE:
+			goto err;
+			break;
+
+		default:
+			goto err;
+			break;
+		}
+	}
+
+	return 0;
+
+err:
+	dev_err(dev, "invalid base command: 0x%x\n", reg_offset);
+	return -EINVAL;
+}
+
 static void g2d_cmdlist_prolog(struct g2d_cmdlist *cmdlist, bool event)
 {
 	cmdlist->last = 0;
