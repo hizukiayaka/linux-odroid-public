@@ -886,6 +886,47 @@ static unsigned long g2d_get_buf_bpp(unsigned int format)
 	return bpp;
 }
 
+static bool g2d_is_rect_valid(const struct g2d_rect *rect,
+				const struct g2d_buf_info *buf_info)
+{
+	int width, height;
+	unsigned long last_pos;
+
+	/* This check also makes sure that right_x > left_x. */
+	width = (int)rect->right_x - (int)rect->left_x;
+	if (width < G2D_LEN_MIN || width > G2D_LEN_MAX) {
+		DRM_ERROR("width[%d] is out of range!\n", width);
+		return false;
+	}
+
+	/* This check also makes sure that bottom_y > top_y. */
+	height = (int)rect->bottom_y - (int)rect->top_y;
+	if (height < G2D_LEN_MIN || height > G2D_LEN_MAX) {
+		DRM_ERROR("height[%d] is out of range!\n", height);
+		return false;
+	}
+
+	/* Compute the position of the last byte that the engine accesses. */
+	last_pos = ((unsigned long)rect->bottom_y - 1) *
+		(unsigned long)buf_info->stride +
+		(unsigned long)rect->right_x * (unsigned long)buf_info->bpp - 1;
+
+	/*
+	 * Since right_x > left_x and bottom_y > top_y we already know
+	 * that the first_pos < last_pos (first_pos being the position
+	 * of the first byte the engine accesses), it just remains to
+	 * check if last_pos is smaller then the buffer size.
+	 */
+
+	if (last_pos >= buf_info->size) {
+		DRM_ERROR("last engine access position [%lu] "
+			"is out of range [%u]!\n", last_pos, buf_info->size);
+		return false;
+	}
+
+	return true;
+}
+
 static void g2d_dma_start(struct g2d_data *g2d,
 			  struct g2d_runqueue_node *runqueue_node)
 {
