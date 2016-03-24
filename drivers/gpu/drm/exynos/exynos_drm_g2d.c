@@ -276,6 +276,7 @@ struct g2d_cmdlist_node {
 	struct list_head	list;
 	struct g2d_cmdlist	*cmdlist;
 	dma_addr_t		dma_addr;
+	struct g2d_buf_info	buf_info[MAX_REG_TYPE_NR];
 
 	struct drm_exynos_pending_g2d_event	*event;
 };
@@ -410,6 +411,8 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
 			g2d->cmdlist_pool_virt + nr * G2D_CMDLIST_SIZE;
 		node[nr].dma_addr =
 			g2d->cmdlist_pool + nr * G2D_CMDLIST_SIZE;
+
+		memset(&node[nr].buf_info, 0x00, sizeof(struct g2d_buf_info));
 
 		list_add_tail(&node[nr].list, &g2d->free_cmdlist);
 	}
