@@ -1435,6 +1435,120 @@ static void g2d_inspect_rop4(unsigned long value, unsigned int *flags)
 		*flags &= ~NODE_ROP4_MASKED_THIRD_OP;
 }
 
+static int g2d_validate_cmds(struct device *dev,
+				struct g2d_cmdlist_node *node,
+				unsigned int nr)
+{
+	struct g2d_cmdlist *cmdlist = node->cmdlist;
+	unsigned int reg_offset = 0;
+	u32 index;
+
+	for (index = cmdlist->last - 2 * nr; index < cmdlist->last; index += 2) {
+		reg_offset = cmdlist->data[index] & 0x0fff;
+
+		if (unlikely(reg_offset < G2D_VALID_START ||
+				reg_offset > G2D_VALID_END))
+			goto err;
+		if (unlikely(reg_offset % 4))
+			goto err;
+
+		switch (reg_offset) {
+		case G2D_SRC_LEFT_TOP:
+		case G2D_DST_LEFT_TOP:
+			if (index + 2 >= cmdlist->last)
+				goto err;
+
+			if (g2d_validate_coords(&cmdlist->data[index], node->buf_info))
+				goto err;
+
+			index += 2;
+			break;
+
+		case G2D_PAT_SIZE:
+			if (g2d_validate_pattern(cmdlist->data[index + 1], &node->buf_info[REG_TYPE_PAT]))
+				goto err;
+			break;
+
+		case G2D_SRC_SELECT:
+			g2d_inspect_src_select(cmdlist->data[index + 1], &node->flags);
+			break;
+
+		case G2D_BITBLT_START:
+			if (g2d_validate_bitblt_start(cmdlist->data[index + 1], node))
+				goto err;
+			break;
+
+		case G2D_BITBLT_COMMAND:
+			g2d_inspect_bitblt_command(cmdlist->data[index + 1], &node->flags);
+			break;
+
+		case G2D_THIRD_OPERAND:
+			g2d_inspect_third_operand(cmdlist->data[index + 1], &node->flags);
+			break;
+
+		case G2D_ROP4:
+			g2d_inspect_rop4(cmdlist->data[index + 1], &node->flags);
+			break;
+
+		/*
+		 * These command don't need any specific validation.
+		 */
+		case G2D_BLEND_FUNCTION:
+		case G2D_ROUND_MODE:
+		case G2D_SRC_MASK_DIRECT:
+		case G2D_DST_PAT_DIRECT:
+		case G2D_SRC_REPEAT_MODE:
+		case G2D_SRC_PAD_VALUE:
+		case G2D_SRC_A8_RGB_EXT:
+		case G2D_SRC_SCALE_CTRL:
+		case G2D_SRC_XSCALE:
+		case G2D_SRC_YSCALE:
+		case G2D_DST_SELECT:
+		case G2D_DST_A8_RGB_EXT:
+		case G2D_MSK_REPEAT_MODE:
+		case G2D_MSK_PAD_VALUE:
+		case G2D_MSK_SCALE_CTRL:
+		case G2D_MSK_XSCALE:
+		case G2D_MSK_YSCALE:
+		case G2D_ALPHA:
+		case G2D_FG_COLOR:
+		case G2D_BG_COLOR:
+		case G2D_BS_COLOR:
+		case G2D_SF_COLOR:
+			break;
+
+		/*
+		 * TODO:
+		 *  - rotation interacts with source/mask/pattern rectangle validation
+		 *  - pattern offset needs range check
+		 *  - clipping window has to be inside the destination rectangle
+		 */
+		case G2D_ROTATE:
+		case G2D_PAT_OFFSET:
+		case G2D_CW_LEFT_TOP:
+		case G2D_CW_RIGHT_BOTTOM:
+			goto err;
+			break;
+
+		default:
+			goto err;
+			break;
+		}
+	}
+
+	/*
+	 * The regular commands have to end with a bitblt start.
+	 */
+	if (reg_offset != G2D_BITBLT_START)
+		goto err;
+
+	return 0;
+
+err:
+	dev_err(dev, "invalid command: 0x%x\n", reg_offset);
+	return -EINVAL;
+}
+
 static void g2d_cmdlist_prolog(struct g2d_cmdlist *cmdlist, bool event)
 {
 	cmdlist->last = 0;
