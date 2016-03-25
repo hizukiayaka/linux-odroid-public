@@ -1,0 +1,51 @@
+<refentry id="cec-ioc-adap-log-status">
+  <refmeta>
+    <refentrytitle>ioctl CEC_ADAP_LOG_STATUS</refentrytitle>
+    &manvol;
+  </refmeta>
+
+  <refnamediv>
+    <refname>CEC_ADAP_LOG_STATUS</refname>
+    <refpurpose>Log CEC adapter status</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <funcsynopsis>
+      <funcprototype>
+	<funcdef>int <function>ioctl</function></funcdef>
+	<paramdef>int <parameter>fd</parameter></paramdef>
+	<paramdef>int <parameter>request</parameter></paramdef>
+      </funcprototype>
+    </funcsynopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Arguments</title>
+
+    <variablelist>
+      <varlistentry>
+	<term><parameter>fd</parameter></term>
+	<listitem>
+	  <para>File descriptor returned by
+	  <link linkend='cec-func-open'><function>open()</function></link>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><parameter>request</parameter></term>
+	<listitem>
+	  <para>CEC_ADAP_LOG_STATUS</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1>
+    <title>Description</title>
+
+    <para>When debugging CEC problems it is useful to examine the current
+status of the CEC state machine and hardware. When this ioctl is called the
+driver will output the current CEC adapter status to the kernel log.
+</para>
+  </refsect1>
+
+</refentry>
