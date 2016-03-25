@@ -6,6 +6,7 @@ config VIDEO_VIVID
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
+	select MEDIA_CEC
 	select VIDEOBUF2_VMALLOC
 	default n
 	---help---
