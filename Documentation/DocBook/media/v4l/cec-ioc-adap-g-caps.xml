@@ -135,6 +135,16 @@
 	    <entry>This CEC adapter is an HDMI source, &ie; it has an HDMI output
 	    connector.</entry>
 	  </row>
+	  <row>
+	    <entry><constant>CEC_CAP_ARC</constant></entry>
+	    <entry>0x00000080</entry>
+	    <entry>This adapter supports the Audio Return Channel protocol.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_CAP_CDC_HPD</constant></entry>
+	    <entry>0x00000100</entry>
+	    <entry>This adapter supports the hotplug detect protocol over CDC.</entry>
+	  </row>
 	</tbody>
       </tgroup>
     </table>

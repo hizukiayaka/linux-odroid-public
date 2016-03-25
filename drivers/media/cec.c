@@ -160,6 +160,42 @@ u16 cec_phys_addr_parent(u16 phys_addr)
 }
 EXPORT_SYMBOL_GPL(cec_phys_addr_parent);
 
+/*
+ * Two physical addresses are adjacent if they have a direct link.
+ * So 0.0.0.0 and 1.0.0.0 are adjacent, but not 0.0.0.0 and 1.1.0.0.
+ * And 2.3.0.0 and 2.3.1.0 are adjacent, but not 2.3.0.0 and 2.4.0.0.
+ *
+ * In other words, the two addresses share the same prefix, but then
+ * one has a zero and the other has a non-zero value. And the remaining
+ * components are all zero for both.
+ */
+static bool cec_pa_are_adjacent(const struct cec_adapter *adap, u16 pa1, u16 pa2)
+{
+	u16 mask = 0xf000;
+	int i;
+
+	if (pa1 == CEC_PHYS_ADDR_INVALID || pa2 == CEC_PHYS_ADDR_INVALID)
+		return false;
+	for (i = 0; i < 3; i++) {
+		if ((pa1 & mask) != (pa2 & mask))
+			break;
+		mask = (mask >> 4) | 0xf000;
+	}
+	if ((pa1 & ~mask) || (pa2 & ~mask))
+		return false;
+	if (!(pa1 & mask) ^ !(pa2 & mask))
+		return true;
+	return false;
+}
+
+static bool cec_la_are_adjacent(const struct cec_adapter *adap, u8 la1, u8 la2)
+{
+	u16 pa1 = adap->phys_addrs[la1];
+	u16 pa2 = adap->phys_addrs[la2];
+
+	return cec_pa_are_adjacent(adap, pa1, pa2);
+}
+
 static int cec_log_addr2idx(const struct cec_adapter *adap, u8 log_addr)
 {
 	int i;
@@ -1034,7 +1070,9 @@ static int cec_receive_notify(struct cec_adapter *adap, struct cec_msg *msg,
 	int la_idx = cec_log_addr2idx(adap, dest_laddr);
 	bool is_directed = la_idx >= 0;
 	bool from_unregistered = init_laddr == 0xf;
+	u16 cdc_phys_addr;
 	struct cec_msg tx_cec_msg = { };
+	u8 *tx_msg = tx_cec_msg.msg;
 
 	dprintk(1, "cec_receive_notify: %*ph\n", msg->len, msg->msg);
 
@@ -1045,12 +1083,57 @@ static int cec_receive_notify(struct cec_adapter *adap, struct cec_msg *msg,
 	}
 
 	/*
-	 * REPORT_PHYSICAL_ADDR, CEC_MSG_USER_CONTROL_PRESSED and
+	 * ARC, CDC and REPORT_PHYSICAL_ADDR, CEC_MSG_USER_CONTROL_PRESSED and
 	 * CEC_MSG_USER_CONTROL_RELEASED messages always have to be
 	 * handled by the CEC core, even if the passthrough mode is on.
-	 * The others are just ignored if passthrough mode is on.
+	 * ARC and CDC messages will never be seen even if passthrough is
+	 * on, but the others are just passed on normally after we processed
+	 * them.
 	 */
 	switch (msg->msg[1]) {
+	case CEC_MSG_INITIATE_ARC:
+	case CEC_MSG_TERMINATE_ARC:
+	case CEC_MSG_REQUEST_ARC_INITIATION:
+	case CEC_MSG_REQUEST_ARC_TERMINATION:
+	case CEC_MSG_REPORT_ARC_INITIATED:
+	case CEC_MSG_REPORT_ARC_TERMINATED:
+		/* ARC messages are never passed through if CAP_ARC is set */
+
+		/* Abort/ignore if ARC is not supported */
+		if (!(adap->capabilities & CEC_CAP_ARC)) {
+			/* Just abort if nobody is listening */
+			if (is_directed && !is_reply && !adap->cec_follower &&
+			    !adap->follower_cnt)
+				return cec_feature_abort(adap, msg);
+			goto skip_processing;
+		}
+		/* Ignore if addressing is wrong */
+		if (is_broadcast || from_unregistered)
+			return 0;
+		break;
+
+	case CEC_MSG_CDC_MESSAGE:
+		switch (msg->msg[4]) {
+		case CEC_MSG_CDC_HPD_REPORT_STATE:
+		case CEC_MSG_CDC_HPD_SET_STATE:
+			/*
+			 * CDC_HPD messages are never passed through if
+			 * CAP_CDC_HPD is set
+			 */
+
+			/* Ignore if CDC_HPD is not supported */
+			if (!(adap->capabilities & CEC_CAP_CDC_HPD))
+				goto skip_processing;
+			/* or the addressing is wrong */
+			if (!is_broadcast)
+				return 0;
+			break;
+		default:
+			/* Other CDC messages are ignored */
+			goto skip_processing;
+		}
+		break;
+
 	case CEC_MSG_GET_CEC_VERSION:
 	case CEC_MSG_GIVE_DEVICE_VENDOR_ID:
 	case CEC_MSG_ABORT:
@@ -1185,6 +1268,97 @@ static int cec_receive_notify(struct cec_adapter *adap, struct cec_msg *msg,
 		if (adap->log_addrs.cec_version >= CEC_OP_CEC_VERSION_2_0)
 			return cec_report_features(adap, la_idx);
 		return 0;
+
+	case CEC_MSG_REQUEST_ARC_INITIATION:
+		if (!adap->is_source ||
+		    !cec_la_are_adjacent(adap, dest_laddr, init_laddr))
+			return cec_feature_refused(adap, msg);
+		cec_msg_initiate_arc(&tx_cec_msg, false);
+		return cec_transmit_msg(adap, &tx_cec_msg, false);
+
+	case CEC_MSG_REQUEST_ARC_TERMINATION:
+		if (!adap->is_source ||
+		    !cec_la_are_adjacent(adap, dest_laddr, init_laddr))
+			return cec_feature_refused(adap, msg);
+		cec_msg_terminate_arc(&tx_cec_msg, false);
+		return cec_transmit_msg(adap, &tx_cec_msg, false);
+
+	case CEC_MSG_INITIATE_ARC:
+		if (adap->is_source ||
+		    !cec_la_are_adjacent(adap, dest_laddr, init_laddr))
+			return cec_feature_refused(adap, msg);
+		if (call_op(adap, sink_initiate_arc))
+			return 0;
+		cec_msg_report_arc_initiated(&tx_cec_msg);
+		return cec_transmit_msg(adap, &tx_cec_msg, false);
+
+	case CEC_MSG_TERMINATE_ARC:
+		if (adap->is_source ||
+		    !cec_la_are_adjacent(adap, dest_laddr, init_laddr))
+			return cec_feature_refused(adap, msg);
+		call_void_op(adap, sink_terminate_arc);
+		cec_msg_report_arc_terminated(&tx_cec_msg);
+		return cec_transmit_msg(adap, &tx_cec_msg, false);
+
+	case CEC_MSG_REPORT_ARC_INITIATED:
+		if (!adap->is_source ||
+		    !cec_la_are_adjacent(adap, dest_laddr, init_laddr))
+			return cec_feature_refused(adap, msg);
+		call_void_op(adap, source_arc_initiated);
+		return 0;
+
+	case CEC_MSG_REPORT_ARC_TERMINATED:
+		if (!adap->is_source ||
+		    !cec_la_are_adjacent(adap, dest_laddr, init_laddr))
+			return cec_feature_refused(adap, msg);
+		call_void_op(adap, source_arc_terminated);
+		return 0;
+
+	case CEC_MSG_CDC_MESSAGE: {
+		unsigned int shift;
+		unsigned int input_port;
+
+		cdc_phys_addr = (msg->msg[2] << 8) | msg->msg[3];
+		if (!cec_pa_are_adjacent(adap, cdc_phys_addr, adap->phys_addr))
+			return 0;
+
+		switch (msg->msg[4]) {
+		case CEC_MSG_CDC_HPD_REPORT_STATE:
+			/*
+			 * Ignore if we're not a sink or the message comes from
+			 * an upstream device.
+			 */
+			if (adap->is_source || cdc_phys_addr <= adap->phys_addr)
+				return 0;
+			adap->ops->sink_cdc_hpd(adap, msg->msg[5] >> 4, msg->msg[5] & 0xf);
+			return 0;
+		case CEC_MSG_CDC_HPD_SET_STATE:
+			/* Ignore if we're not a source */
+			if (!adap->is_source)
+				return 0;
+			break;
+		default:
+			return 0;
+		}
+
+		input_port = msg->msg[5] >> 4;
+		for (shift = 0; shift < 16; shift += 4) {
+			if (cdc_phys_addr & (0xf000 >> shift))
+				continue;
+			cdc_phys_addr |= input_port << (12 - shift);
+			break;
+		}
+		if (cdc_phys_addr != adap->phys_addr)
+			return 0;
+
+		tx_cec_msg.len = 6;
+		/* broadcast reply */
+		tx_msg[0] = (adap->log_addrs.log_addr[0] << 4) | 0xf;
+		cec_msg_cdc_hpd_report_state(&tx_cec_msg,
+			     msg->msg[5] & 0xf,
+			     adap->ops->source_cdc_hpd(adap, msg->msg[5] & 0xf));
+		return cec_transmit_msg(adap, &tx_cec_msg, false);
+	}
 
 	default:
 		/*
@@ -1680,6 +1854,26 @@ void cec_log_status(struct cec_adapter *adap, struct cec_fh *fh)
 	mutex_unlock(&adap->lock);
 }
 EXPORT_SYMBOL_GPL(cec_log_status);
+
+/*
+ * Called by drivers to update the CDC HPD state of an input port.
+ */
+u8 cec_sink_cdc_hpd(struct cec_adapter *adap, u8 input_port, u8 cdc_hpd_state)
+{
+	struct cec_msg msg = { };
+	int err;
+
+	if (!adap->is_configured)
+		return CEC_OP_HPD_ERROR_INITIATOR_WRONG_STATE;
+
+	msg.msg[0] = (adap->log_addrs.log_addr[0] << 4) | 0xf;
+	cec_msg_cdc_hpd_set_state(&msg, input_port, cdc_hpd_state);
+	err = cec_transmit_msg(adap, &msg, false);
+	if (err)
+		return CEC_OP_HPD_ERROR_OTHER;
+	return CEC_OP_HPD_ERROR_NONE;
+}
+EXPORT_SYMBOL_GPL(cec_sink_cdc_hpd);
 
 
 /* CEC file operations */

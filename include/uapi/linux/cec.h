@@ -226,6 +226,7 @@ static inline bool cec_msg_status_is_ok(const struct cec_msg *msg)
 #define CEC_CAP_TRANSMIT	(1 << 2)
 /*
  * Passthrough all messages instead of processing them.
+ * Note: ARC and CDC messages are always processed.
  */
 #define CEC_CAP_PASSTHROUGH	(1 << 3)
 /* Supports remote control */
@@ -234,6 +235,10 @@ static inline bool cec_msg_status_is_ok(const struct cec_msg *msg)
 #define CEC_CAP_MONITOR_ALL	(1 << 5)
 /* Is a source */
 #define CEC_CAP_IS_SOURCE	(1 << 6)
+/* Supports ARC */
+#define CEC_CAP_ARC		(1 << 7)
+/* Supports CDC HPD */
+#define CEC_CAP_CDC_HPD		(1 << 8)
 
 /**
  * struct cec_caps - CEC capabilities structure.

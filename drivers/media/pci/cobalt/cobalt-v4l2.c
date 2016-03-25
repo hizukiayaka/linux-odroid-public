@@ -1195,6 +1195,38 @@ static int cobalt_cec_adap_transmit(struct cec_adapter *adap, u8 attempts,
 				attempts, signal_free_time, msg);
 }
 
+static u8 cobalt_cec_cdc_hpd(struct cec_adapter *adap, u8 cdc_hpd_state)
+{
+	switch (cdc_hpd_state) {
+	case CEC_OP_HPD_STATE_EDID_DISABLE:
+	case CEC_OP_HPD_STATE_EDID_ENABLE:
+	case CEC_OP_HPD_STATE_EDID_DISABLE_ENABLE:
+		return CEC_OP_HPD_ERROR_NONE;
+	case CEC_OP_HPD_STATE_CP_EDID_DISABLE:
+	case CEC_OP_HPD_STATE_CP_EDID_ENABLE:
+	case CEC_OP_HPD_STATE_CP_EDID_DISABLE_ENABLE:
+	default:
+		return CEC_OP_HPD_ERROR_INITIATOR_WRONG_STATE;
+	}
+}
+
+static int cobalt_sink_initiate_arc(struct cec_adapter *adap)
+{
+	return 0;
+}
+
+static void cobalt_sink_terminate_arc(struct cec_adapter *adap)
+{
+}
+
+static void cobalt_source_arc_initiated(struct cec_adapter *adap)
+{
+}
+
+static void cobalt_source_arc_terminated(struct cec_adapter *adap)
+{
+}
+
 static int cobalt_received(struct cec_adapter *adap, struct cec_msg *msg)
 {
 	struct cec_msg reply;
@@ -1223,6 +1255,11 @@ const struct cec_adap_ops cobalt_cec_adap_ops = {
 	.adap_enable = cobalt_cec_adap_enable,
 	.adap_log_addr = cobalt_cec_adap_log_addr,
 	.adap_transmit = cobalt_cec_adap_transmit,
+	.source_cdc_hpd = cobalt_cec_cdc_hpd,
+	.sink_initiate_arc = cobalt_sink_initiate_arc,
+	.sink_terminate_arc = cobalt_sink_terminate_arc,
+	.source_arc_initiated = cobalt_source_arc_initiated,
+	.source_arc_terminated = cobalt_source_arc_terminated,
 	.received = cobalt_received,
 };
 

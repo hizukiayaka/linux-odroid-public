@@ -217,6 +217,16 @@ struct cec_adap_ops {
 
 	/* High-level CEC message callback */
 	int (*received)(struct cec_adapter *adap, struct cec_msg *msg);
+
+	/* High-level CDC Hotplug Detect callbacks */
+	u8 (*source_cdc_hpd)(struct cec_adapter *adap, u8 cdc_hpd_state);
+	void (*sink_cdc_hpd)(struct cec_adapter *adap, u8 cdc_hpd_state, u8 cdc_hpd_error);
+
+	/* High-level Audio Return Channel callbacks */
+	int (*sink_initiate_arc)(struct cec_adapter *adap);
+	int (*sink_terminate_arc)(struct cec_adapter *adap);
+	int (*source_arc_initiated)(struct cec_adapter *adap);
+	int (*source_arc_terminated)(struct cec_adapter *adap);
 };
 
 The received() callback allows the driver to optionally handle a newly
@@ -228,6 +238,62 @@ If the driver wants to process a CEC message, then it can implement this
 callback. If it doesn't want to handle this message, then it should return
 -ENOMSG, otherwise the CEC framework assumes it processed this message and
 it will not no anything with it.
+
+The other callbacks deal with two CEC features: CDC Hotplug Detect and
+Audio Return Channel. Here the framework takes care of handling these
+messages and it calls the callbacks to notify the driver when it needs
+to take action.
+
+CDC Hotplug Support
+-------------------
+
+A source received a hotplug state change message:
+
+	u8 (*source_cdc_hpd)(struct cec_adapter *adap, u8 cdc_hpd_state);
+
+A source received a CEC_MSG_CDC_HPD_SET_STATE message. The framework will
+reply with a CEC_MSG_CDC_HPD_REPORT_STATE message and this callback is used
+to fill in the HPD Error Code Operand of the REPORT_STATE message. In addition,
+the driver can act in this callback on the hotplug state change.
+
+Only implement if CEC_CAP_CDC_HPD is set.
+
+A sink received a hotplug report state message:
+
+	void (*sink_cdc_hpd)(struct cec_adapter *adap, u8 cdc_hpd_state, u8 cdc_hpd_error);
+
+A sink received a CEC_MSG_CDC_HPD_REPORT_STATE message. This callback will
+do anything necessary to implement this hotplug change. The two arguments
+are the HPD Error State and HPD Error Code Operands from the CEC_MSG_CDC_HPD_REPORT_STATE
+message.
+
+
+Audio Return Channel Support
+----------------------------
+
+Called if a CEC_MSG_INITIATE_ARC message is received by an HDMI sink.
+This callback should start sending audio over the audio return channel. If
+successful it should return 0.
+
+	int (*sink_initiate_arc)(struct cec_adapter *adap);
+
+Called if a CEC_MSG_TERMINATE_ARC message is received by an HDMI sink.
+This callback should stop sending audio over the audio return channel. If
+successful it should return 0.
+
+	void (*sink_terminate_arc)(struct cec_adapter *adap);
+
+Called if a CEC_MSG_REPORT_ARC_INITIATED message is received by an
+HDMI source. This callback can be used to enable receiving audio from
+the audio return channel.
+
+	void (*source_arc_initiated)(struct cec_adapter *adap);
+
+Called if a CEC_MSG_REPORT_ARC_TERMINATED message is received by an
+HDMI source. This callback can be used to disable receiving audio from
+the audio return channel.
+
+	void (*source_arc_terminated)(struct cec_adapter *adap);
 
 
 CEC framework functions
@@ -273,6 +339,15 @@ log_addrs->num_log_addrs set to 0. The block argument is ignored when
 unconfiguring. This function will just return if the physical address is
 invalid. Once the physical address becomes valid, then the framework will
 attempt to claim these logical addresses.
+
+u8 cec_sink_cdc_hpd(struct cec_adapter *adap, u8 input_port, u8 cdc_hpd_state);
+
+If an HDMI receiver supports hotplug signalling over CDC (CEC_CAP_CDC_HPD is
+set), then the driver should call this function whenever the hotplug state
+changes for an input. This call will send an appropriate CDC message over
+the CEC line. It returns CEC_OP_HPD_ERROR_NONE on success, if the adapter
+is unconfigured it returns CEC_OP_HPD_ERROR_INITIATOR_WRONG_STATE and if
+the cec_transmit fails it returns CEC_OP_HPD_ERROR_OTHER.
 
 void cec_log_status(struct cec_adapter *adap);
 

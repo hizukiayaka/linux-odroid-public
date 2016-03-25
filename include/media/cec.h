@@ -108,6 +108,16 @@ struct cec_adap_ops {
 
 	/* High-level CEC message callback */
 	int (*received)(struct cec_adapter *adap, struct cec_msg *msg);
+
+	/* High-level CDC Hotplug Detect callbacks */
+	u8 (*source_cdc_hpd)(struct cec_adapter *adap, u8 cdc_hpd_state);
+	void (*sink_cdc_hpd)(struct cec_adapter *adap, u8 cdc_hpd_state, u8 cdc_hpd_error);
+
+	/* High-level Audio Return Channel callbacks */
+	int (*sink_initiate_arc)(struct cec_adapter *adap);
+	void (*sink_terminate_arc)(struct cec_adapter *adap);
+	void (*source_arc_initiated)(struct cec_adapter *adap);
+	void (*source_arc_terminated)(struct cec_adapter *adap);
 };
 
 /*
@@ -194,6 +204,7 @@ void cec_s_available_log_addrs(struct cec_adapter *adap, u8 available_las);
 int cec_transmit_msg(struct cec_adapter *adap, struct cec_msg *msg,
 		     bool block);
 
+u8 cec_sink_cdc_hpd(struct cec_adapter *adap, u8 input_port, u8 cdc_hpd_state);
 void cec_log_status(struct cec_adapter *adap, struct cec_fh *fh);
 
 /* Called by the adapter */

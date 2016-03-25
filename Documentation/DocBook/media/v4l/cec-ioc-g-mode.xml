@@ -187,6 +187,42 @@ The follower can of course always call &CEC-TRANSMIT;.</para>
 	&cs-def;
 	<tbody valign="top">
 	  <row>
+	    <entry><constant>CEC_MSG_INITIATE_ARC</constant></entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_MSG_TERMINATE_ARC</constant></entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_MSG_REQUEST_ARC_INITIATION</constant></entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_MSG_REQUEST_ARC_TERMINATION</constant></entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_MSG_REPORT_ARC_INITIATED</constant></entry>
+	    <entry></entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_MSG_REPORT_ARC_TERMINATED</constant></entry>
+	    <entry>If <constant>CEC_CAP_ARC</constant> is not set, then just pass
+	    it on to userspace for processing. However, if <constant>CEC_CAP_ARC</constant> is
+	    set, then the core framework processes this message and userspace will
+	    not see it, not even in passthrough mode.</entry>
+	  </row>
+	  <row>
+	    <entry><constant>CEC_MSG_CDC_MESSAGE</constant></entry>
+	    <entry>If <constant>CEC_CAP_CDC_HPD</constant> is not set, then just pass
+	    it on to userspace for processing. Do the same if the CDC command is not
+	    one of <constant>CEC_MSG_CDC_HPD_REPORT_STATE</constant> or
+	    <constant>CEC_MSG_CDC_HPD_SET_STATE</constant>. Else the core framework
+	    processes this message and userspace will not see it, not even in passthrough
+	    mode.</entry>
+	  </row>
+	  <row>
 	    <entry><constant>CEC_MSG_GET_CEC_VERSION</constant></entry>
 	    <entry>When in passthrough mode this message has to be handled by userspace,
 	    otherwise the core will return the CEC version that was set with &CEC-ADAP-S-LOG-ADDRS;.</entry>

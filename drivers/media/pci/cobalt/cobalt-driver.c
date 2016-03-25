@@ -517,10 +517,10 @@ static void cobalt_stream_struct_init(struct cobalt *cobalt)
 static int cobalt_create_cec_adap(struct cobalt_stream *s)
 {
 	u32 caps = CEC_CAP_TRANSMIT | CEC_CAP_LOG_ADDRS |
-		CEC_CAP_PASSTHROUGH | CEC_CAP_RC;
+		CEC_CAP_PASSTHROUGH | CEC_CAP_RC | CEC_CAP_ARC;
 
 	if (s->is_output)
-		caps |= CEC_CAP_IS_SOURCE;
+		caps |= CEC_CAP_IS_SOURCE | CEC_CAP_CDC_HPD;
 	s->cec_adap = cec_create_adapter(&cobalt_cec_adap_ops,
 				 s, s->vdev.name, caps, 1,
 				 &s->cobalt->pci_dev->dev);
