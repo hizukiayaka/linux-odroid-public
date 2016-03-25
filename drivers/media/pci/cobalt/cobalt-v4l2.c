@@ -600,6 +600,7 @@ static int cobalt_log_status(struct file *file, void *priv_fh)
 	cobalt_pcie_status_show(cobalt);
 	cobalt_cpld_status(cobalt);
 	cobalt_irq_log_status(cobalt);
+	cec_log_status(s->cec_adap, NULL);
 	v4l2_subdev_call(s->sd, core, log_status);
 	if (!s->is_output) {
 		cobalt_video_input_status_show(s);
@@ -1059,6 +1060,16 @@ static int cobalt_s_edid(struct file *file, void *fh, struct v4l2_edid *edid)
 	edid->pad = 0;
 	ret = v4l2_subdev_call(s->sd, pad, set_edid, edid);
 	edid->pad = pad;
+	if (!ret) {
+		u16 pa = CEC_PHYS_ADDR_INVALID;
+
+		if (edid->blocks) {
+			pa = cec_get_edid_phys_addr(edid->edid,
+						    edid->blocks * 128, NULL);
+			pa = cec_phys_addr_parent(pa);
+		}
+		cec_s_phys_addr(s->cec_adap, pa, false);
+	}
 	return ret;
 }
 
@@ -1159,6 +1170,62 @@ static const struct v4l2_file_operations cobalt_empty_fops = {
 	.release = v4l2_fh_release,
 };
 
+static inline struct v4l2_subdev *adap_to_sd(struct cec_adapter *adap)
+{
+	struct cobalt_stream *s = adap->priv;
+
+	return s->sd;
+}
+
+static int cobalt_cec_adap_enable(struct cec_adapter *adap, bool enable)
+{
+	return v4l2_subdev_call(adap_to_sd(adap), cec, adap_enable, enable);
+}
+
+static int cobalt_cec_adap_log_addr(struct cec_adapter *adap, u8 log_addr)
+{
+	return v4l2_subdev_call(adap_to_sd(adap), cec, adap_log_addr,
+				log_addr);
+}
+
+static int cobalt_cec_adap_transmit(struct cec_adapter *adap, u8 attempts,
+				    u32 signal_free_time, struct cec_msg *msg)
+{
+	return v4l2_subdev_call(adap_to_sd(adap), cec, adap_transmit,
+				attempts, signal_free_time, msg);
+}
+
+static int cobalt_received(struct cec_adapter *adap, struct cec_msg *msg)
+{
+	struct cec_msg reply;
+	u16 pa;
+
+	cec_msg_init(&reply, adap->log_addrs.log_addr[0],
+		     cec_msg_initiator(msg));
+
+	switch (msg->msg[1]) {
+	case CEC_MSG_SET_STREAM_PATH:
+		if (!adap->is_source)
+			return -ENOMSG;
+		cec_ops_set_stream_path(msg, &pa);
+		if (pa != adap->phys_addr)
+			return -ENOMSG;
+		cec_msg_active_source(&reply, adap->phys_addr);
+		cec_transmit_msg(adap, &reply, false);
+		break;
+	default:
+		return -ENOMSG;
+	}
+	return 0;
+}
+
+const struct cec_adap_ops cobalt_cec_adap_ops = {
+	.adap_enable = cobalt_cec_adap_enable,
+	.adap_log_addr = cobalt_cec_adap_log_addr,
+	.adap_transmit = cobalt_cec_adap_transmit,
+	.received = cobalt_received,
+};
+
 static int cobalt_node_register(struct cobalt *cobalt, int node)
 {
 	static const struct v4l2_dv_timings dv1080p60 =
@@ -1166,13 +1233,11 @@ static int cobalt_node_register(struct cobalt *cobalt, int node)
 	struct cobalt_stream *s = cobalt->streams + node;
 	struct video_device *vdev = &s->vdev;
 	struct vb2_queue *q = &s->q;
-	int ret;
+	int ret = 0;
 
 	mutex_init(&s->lock);
 	spin_lock_init(&s->irqlock);
 
-	snprintf(vdev->name, sizeof(vdev->name),
-			"%s-%d", cobalt->v4l2_dev.name, node);
 	s->width = 1920;
 	/* Audio frames are just 4 lines of 1920 bytes */
 	s->height = s->is_audio ? 4 : 1080;
@@ -1193,6 +1258,11 @@ static int cobalt_node_register(struct cobalt *cobalt, int node)
 	if (!s->is_audio) {
 		if (s->is_dummy)
 			cobalt_warn("Setting up dummy video node %d\n", node);
+		if (s->sd) {
+			ret = cec_register_adapter(s->cec_adap);
+			if (ret)
+				return ret;
+		}
 		vdev->v4l2_dev = &cobalt->v4l2_dev;
 		if (s->is_dummy)
 			vdev->fops = &cobalt_empty_fops;
@@ -1206,8 +1276,10 @@ static int cobalt_node_register(struct cobalt *cobalt, int node)
 			vdev->ctrl_handler = s->sd->ctrl_handler;
 		s->timings = dv1080p60;
 		v4l2_subdev_call(s->sd, video, s_dv_timings, &s->timings);
-		if (!s->is_output && s->sd)
+		if (!s->is_output && s->sd) {
 			cobalt_enable_input(s);
+			cec_s_phys_addr(s->cec_adap, 0, false);
+		}
 		vdev->ioctl_ops = s->is_dummy ? &cobalt_ioctl_empty_ops :
 				  &cobalt_ioctl_ops;
 	}
@@ -1227,16 +1299,20 @@ static int cobalt_node_register(struct cobalt *cobalt, int node)
 	vdev->queue = q;
 
 	video_set_drvdata(vdev, s);
-	ret = vb2_queue_init(q);
+	if (ret == 0)
+		ret = vb2_queue_init(q);
 	if (!s->is_audio && ret == 0)
 		ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
-	else if (!s->is_dummy)
+	else if (!s->is_dummy && ret == 0)
 		ret = cobalt_alsa_init(s);
 
 	if (ret < 0) {
-		if (!s->is_audio)
+		if (!s->is_audio) {
+			if (s->sd)
+				cec_unregister_adapter(s->cec_adap);
 			cobalt_err("couldn't register v4l2 device node %d\n",
 					node);
+		}
 		return ret;
 	}
 	cobalt_info("registered node %d\n", node);
@@ -1267,9 +1343,11 @@ void cobalt_nodes_unregister(struct cobalt *cobalt)
 		struct cobalt_stream *s = cobalt->streams + node;
 		struct video_device *vdev = &s->vdev;
 
-		if (!s->is_audio)
+		if (!s->is_audio) {
 			video_unregister_device(vdev);
-		else if (!s->is_dummy)
+			cec_unregister_adapter(s->cec_adap);
+		} else if (!s->is_dummy) {
 			cobalt_alsa_exit(s);
+		}
 	}
 }

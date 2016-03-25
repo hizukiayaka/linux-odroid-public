@@ -234,6 +234,9 @@ void cobalt_irq_log_status(struct cobalt *cobalt)
 	u32 mask;
 	int i;
 
+	cobalt_info("irq: edge=%08x mask=%08x\n",
+		    cobalt_read_bar1(cobalt, COBALT_SYS_STAT_EDGE),
+		    cobalt_read_bar1(cobalt, COBALT_SYS_STAT_MASK));
 	cobalt_info("irq: adv1=%u adv2=%u advout=%u none=%u full=%u\n",
 		    cobalt->irq_adv1, cobalt->irq_adv2, cobalt->irq_advout,
 		    cobalt->irq_none, cobalt->irq_full_fifo);

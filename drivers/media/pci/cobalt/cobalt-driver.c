@@ -76,6 +76,7 @@ static u8 edid[256] = {
 	0x0A, 0x0A, 0x0A, 0x0A, 0x00, 0x00, 0x00, 0x10,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x68,
+
 	0x02, 0x03, 0x1a, 0xc0, 0x48, 0xa2, 0x10, 0x04,
 	0x02, 0x01, 0x21, 0x14, 0x13, 0x23, 0x09, 0x07,
 	0x07, 0x65, 0x03, 0x0c, 0x00, 0x10, 0x00, 0xe2,
@@ -149,17 +150,42 @@ static void cobalt_notify(struct v4l2_subdev *sd,
 	struct cobalt *cobalt = to_cobalt(sd->v4l2_dev);
 	unsigned sd_nr = cobalt_get_sd_nr(sd);
 	struct cobalt_stream *s = &cobalt->streams[sd_nr];
-	bool hotplug = arg ? *((int *)arg) : false;
-
-	if (s->is_output)
-		return;
+	struct v4l2_subdev_cec_tx_done *tx_done = arg;
 
 	switch (notification) {
-	case ADV76XX_HOTPLUG:
+	case V4L2_SUBDEV_CEC_TX_DONE:
+		cec_transmit_done(s->cec_adap, tx_done->status,
+				  tx_done->arb_lost_cnt, tx_done->nack_cnt,
+				  tx_done->low_drive_cnt, tx_done->error_cnt);
+		return;
+	case V4L2_SUBDEV_CEC_RX_MSG:
+		cec_received_msg(s->cec_adap, arg);
+		return;
+	default:
+		break;
+	}
+
+	if (s->is_output) {
+		switch (notification) {
+		case ADV7511_EDID_DETECT: {
+			struct adv7511_edid_detect *ed = arg;
+
+			cec_s_phys_addr(s->cec_adap, ed->phys_addr, false);
+			break;
+		}
+		}
+		return;
+	}
+
+	switch (notification) {
+	case ADV76XX_HOTPLUG: {
+		bool hotplug = arg ? *((int *)arg) : false;
+
 		cobalt_s_bit_sysctrl(cobalt,
 			COBALT_SYS_CTRL_HPD_TO_CONNECTOR_BIT(sd_nr), hotplug);
 		cobalt_dbg(1, "Set hotplug for adv %d to %d\n", sd_nr, hotplug);
 		break;
+	}
 	case V4L2_DEVICE_NOTIFY_EVENT:
 		cobalt_dbg(1, "Format changed for adv %d\n", sd_nr);
 		v4l2_event_queue(&s->vdev, arg);
@@ -438,12 +464,15 @@ static void cobalt_stream_struct_init(struct cobalt *cobalt)
 
 	for (i = 0; i < COBALT_NUM_STREAMS; i++) {
 		struct cobalt_stream *s = &cobalt->streams[i];
+		struct video_device *vdev = &s->vdev;
 
 		s->cobalt = cobalt;
 		s->flags = 0;
 		s->is_audio = false;
 		s->is_output = false;
 		s->is_dummy = true;
+		snprintf(vdev->name, sizeof(vdev->name),
+			 "%s-%d", cobalt->v4l2_dev.name, i);
 
 		/* The Memory DMA channels will always get a lower channel
 		 * number than the FIFO DMA. Video input should map to the
@@ -485,6 +514,19 @@ static void cobalt_stream_struct_init(struct cobalt *cobalt)
 	}
 }
 
+static int cobalt_create_cec_adap(struct cobalt_stream *s)
+{
+	u32 caps = CEC_CAP_TRANSMIT | CEC_CAP_LOG_ADDRS |
+		CEC_CAP_PASSTHROUGH | CEC_CAP_RC;
+
+	if (s->is_output)
+		caps |= CEC_CAP_IS_SOURCE;
+	s->cec_adap = cec_create_adapter(&cobalt_cec_adap_ops,
+				 s, s->vdev.name, caps, 1,
+				 &s->cobalt->pci_dev->dev);
+	return PTR_ERR_OR_ZERO(s->cec_adap);
+}
+
 static int cobalt_subdevs_init(struct cobalt *cobalt)
 {
 	static struct adv76xx_platform_data adv7604_pdata = {
@@ -508,10 +550,10 @@ static int cobalt_subdevs_init(struct cobalt *cobalt)
 		.platform_data = &adv7604_pdata,
 	};
 
-	struct cobalt_stream *s = cobalt->streams;
 	int i;
 
 	for (i = 0; i < COBALT_NUM_INPUTS; i++) {
+		struct cobalt_stream *s = cobalt->streams + i;
 		struct v4l2_subdev_format sd_fmt = {
 			.pad = ADV7604_PAD_SOURCE,
 			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
@@ -525,28 +567,37 @@ static int cobalt_subdevs_init(struct cobalt *cobalt)
 		};
 		int err;
 
-		s[i].pad_source = ADV7604_PAD_SOURCE;
-		s[i].i2c_adap = &cobalt->i2c_adap[i];
-		if (s[i].i2c_adap->dev.parent == NULL)
+		s->pad_source = ADV7604_PAD_SOURCE;
+		s->i2c_adap = &cobalt->i2c_adap[i];
+		if (s->i2c_adap->dev.parent == NULL)
 			continue;
+		err = cobalt_create_cec_adap(s);
+		if (err && !cobalt_ignore_err)
+			continue;
+		if (err)
+			return err;
 		cobalt_s_bit_sysctrl(cobalt,
 				COBALT_SYS_CTRL_NRESET_TO_HDMI_BIT(i), 1);
-		s[i].sd = v4l2_i2c_new_subdev_board(&cobalt->v4l2_dev,
-			s[i].i2c_adap, &adv7604_info, NULL);
-		if (!s[i].sd) {
+		s->sd = v4l2_i2c_new_subdev_board(&cobalt->v4l2_dev,
+			s->i2c_adap, &adv7604_info, NULL);
+		if (!s->sd) {
+			cec_delete_adapter(s->cec_adap);
+			s->cec_adap = NULL;
 			if (cobalt_ignore_err)
 				continue;
 			return -ENODEV;
 		}
-		err = v4l2_subdev_call(s[i].sd, video, s_routing,
+		cec_s_available_log_addrs(s->cec_adap,
+			v4l2_subdev_call(s->sd, cec, adap_available_log_addrs));
+		err = v4l2_subdev_call(s->sd, video, s_routing,
 				ADV76XX_PAD_HDMI_PORT_A, 0, 0);
 		if (err)
 			return err;
-		err = v4l2_subdev_call(s[i].sd, pad, set_edid,
+		err = v4l2_subdev_call(s->sd, pad, set_edid,
 				&cobalt_edid);
 		if (err)
 			return err;
-		err = v4l2_subdev_call(s[i].sd, pad, set_fmt, NULL,
+		err = v4l2_subdev_call(s->sd, pad, set_fmt, NULL,
 				&sd_fmt);
 		if (err)
 			return err;
@@ -557,7 +608,7 @@ static int cobalt_subdevs_init(struct cobalt *cobalt)
 		cobalt_s_bit_sysctrl(cobalt,
 				COBALT_SYS_CTRL_VIDEO_RX_RESETN_BIT(i), 1);
 		mdelay(1);
-		s[i].is_dummy = false;
+		s->is_dummy = false;
 		cobalt->streams[i + COBALT_AUDIO_IN_STREAM].is_dummy = false;
 	}
 	return 0;
@@ -618,17 +669,24 @@ static int cobalt_subdevs_hsma_init(struct cobalt *cobalt)
 		.edid = edid,
 	};
 	struct cobalt_stream *s = &cobalt->streams[COBALT_HSMA_IN_NODE];
+	int err;
 
 	s->i2c_adap = &cobalt->i2c_adap[COBALT_NUM_ADAPTERS - 1];
 	if (s->i2c_adap->dev.parent == NULL)
 		return 0;
+	err = cobalt_create_cec_adap(s);
+	if (err)
+		return err;
 	cobalt_s_bit_sysctrl(cobalt, COBALT_SYS_CTRL_NRESET_TO_HDMI_BIT(4), 1);
 
 	s->sd = v4l2_i2c_new_subdev_board(&cobalt->v4l2_dev,
 			s->i2c_adap, &adv7842_info, NULL);
 	if (s->sd) {
-		int err = v4l2_subdev_call(s->sd, pad, set_edid, &cobalt_edid);
+		int err;
 
+		cec_s_available_log_addrs(s->cec_adap,
+			v4l2_subdev_call(s->sd, cec, adap_available_log_addrs));
+		err = v4l2_subdev_call(s->sd, pad, set_edid, &cobalt_edid);
 		if (err)
 			return err;
 		err = v4l2_subdev_call(s->sd, pad, set_fmt, NULL,
@@ -650,8 +708,13 @@ static int cobalt_subdevs_hsma_init(struct cobalt *cobalt)
 	}
 	cobalt_s_bit_sysctrl(cobalt, COBALT_SYS_CTRL_NRESET_TO_HDMI_BIT(4), 0);
 	cobalt_s_bit_sysctrl(cobalt, COBALT_SYS_CTRL_PWRDN0_TO_HSMA_TX_BIT, 0);
+	cec_delete_adapter(s->cec_adap);
+	s->cec_adap = NULL;
 	s++;
 	s->i2c_adap = &cobalt->i2c_adap[COBALT_NUM_ADAPTERS - 1];
+	err = cobalt_create_cec_adap(s);
+	if (err)
+		return err;
 	s->sd = v4l2_i2c_new_subdev_board(&cobalt->v4l2_dev,
 			s->i2c_adap, &adv7511_info, NULL);
 	if (s->sd) {
@@ -663,6 +726,8 @@ static int cobalt_subdevs_hsma_init(struct cobalt *cobalt)
 		cobalt_s_bit_sysctrl(cobalt,
 				COBALT_SYS_CTRL_VIDEO_TX_RESETN_BIT, 1);
 		cobalt->have_hsma_tx = true;
+		cec_s_available_log_addrs(s->cec_adap,
+			v4l2_subdev_call(s->sd, cec, adap_available_log_addrs));
 		v4l2_subdev_call(s->sd, core, s_power, 1);
 		v4l2_subdev_call(s->sd, video, s_stream, 1);
 		v4l2_subdev_call(s->sd, audio, s_stream, 1);
@@ -672,6 +737,8 @@ static int cobalt_subdevs_hsma_init(struct cobalt *cobalt)
 		cobalt->streams[COBALT_AUDIO_OUT_STREAM].is_dummy = false;
 		return 0;
 	}
+	cec_delete_adapter(s->cec_adap);
+	s->cec_adap = NULL;
 	return -ENODEV;
 }
 
@@ -797,8 +864,9 @@ static void cobalt_remove(struct pci_dev *pci_dev)
 	cobalt_set_interrupt(cobalt, false);
 	flush_workqueue(cobalt->irq_work_queues);
 	cobalt_nodes_unregister(cobalt);
-	for (i = 0; i < COBALT_NUM_ADAPTERS; i++) {
-		struct v4l2_subdev *sd = cobalt->streams[i].sd;
+	for (i = 0; i < COBALT_NUM_STREAMS; i++) {
+		struct cobalt_stream *s = &cobalt->streams[i];
+		struct v4l2_subdev *sd = s->sd;
 		struct i2c_client *client;
 
 		if (sd == NULL)
