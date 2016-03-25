@@ -500,3 +500,7 @@
 &watchdog {
 	status = "okay";
 };
+
+&hdmicec {
+	status = "okay";
+};
