@@ -1161,7 +1161,7 @@ static void g2d_free_runqueue_node(struct g2d_data *g2d,
 	 * objects in each command node so that they are unreferenced.
 	 */
 	list_for_each_entry(node, &runqueue_node->run_cmdlist, list)
-		;
+		g2d_unmap_cmdlist_buffers(g2d, node, runqueue_node->filp);
 	list_splice_tail_init(&runqueue_node->run_cmdlist, &g2d->free_cmdlist);
 	mutex_unlock(&g2d->cmdlist_mutex);
 
@@ -1892,6 +1892,8 @@ static void g2d_close(struct drm_device *drm_dev, struct device *dev,
 		 * there may be some commands in inuse_cmdlist so unmap
 		 * them.
 		 */
+		g2d_unmap_cmdlist_buffers(g2d, node, file);
+
 		list_move_tail(&node->list, &g2d->free_cmdlist);
 	}
 	mutex_unlock(&g2d->cmdlist_mutex);
