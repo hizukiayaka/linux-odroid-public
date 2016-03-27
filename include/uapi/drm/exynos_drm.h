@@ -137,17 +137,6 @@ enum e_drm_exynos_g2d_userptr_flags {
 		G2D_USERPTR_FLAG_READ | G2D_USERPTR_FLAG_WRITE
 };
 
-struct drm_exynos_g2d_set_cmdlist {
-	__u64					cmd;
-	__u64					cmd_buf;
-	__u32					cmd_nr;
-	__u32					cmd_buf_nr;
-
-	/* for g2d event */
-	__u64					event_type;
-	__u64					user_data;
-};
-
 struct drm_exynos_g2d_exec {
 	__u64					async;
 };
@@ -340,7 +329,6 @@ struct drm_exynos_ipp_cmd_ctrl {
 #define DRM_EXYNOS_VIDI_CONNECTION	0x07
 
 /* G2D */
-#define DRM_EXYNOS_G2D_SET_CMDLIST	0x21
 #define DRM_EXYNOS_G2D_EXEC		0x22
 #define DRM_EXYNOS_G2D_GET_VER2		0x23
 #define DRM_EXYNOS_G2D_USERPTR		0x24
@@ -363,8 +351,6 @@ struct drm_exynos_ipp_cmd_ctrl {
 
 #define DRM_IOCTL_EXYNOS_G2D_GET_VER2		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_G2D_GET_VER2, struct drm_exynos_g2d_get_ver2)
-#define DRM_IOCTL_EXYNOS_G2D_SET_CMDLIST	DRM_IOWR(DRM_COMMAND_BASE + \
-		DRM_EXYNOS_G2D_SET_CMDLIST, struct drm_exynos_g2d_set_cmdlist)
 #define DRM_IOCTL_EXYNOS_G2D_EXEC		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_G2D_EXEC, struct drm_exynos_g2d_exec)
 #define DRM_IOCTL_EXYNOS_G2D_USERPTR		DRM_IOW(DRM_COMMAND_BASE + \
