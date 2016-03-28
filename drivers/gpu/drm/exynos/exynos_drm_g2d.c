@@ -1144,6 +1144,55 @@ err:
 	return -EINVAL;
 }
 
+static int g2d_validate_coords(const unsigned long *data,
+				struct g2d_buf_info *buf_info)
+{
+	struct g2d_rect rect;
+
+	unsigned int offset[2];
+	unsigned long value;
+	enum g2d_reg_type type;
+
+	offset[0] = data[0] & 0x0fff;
+	offset[1] = data[2] & 0x0fff;
+
+	/*
+	 * The right-bottom command should follow
+	 * directly after the left-top command.
+	 */
+	if (offset[0] == G2D_SRC_LEFT_TOP &&
+	    offset[1] == G2D_SRC_RIGHT_BOTTOM)
+		type = REG_TYPE_SRC;
+	else
+	if (offset[0] == G2D_DST_LEFT_TOP &&
+	    offset[1] == G2D_DST_RIGHT_BOTTOM)
+		type = REG_TYPE_DST;
+	else
+		goto fail;
+
+	/*
+	 * The base command list hasn't properly setup this buffer type.
+	 */
+	if (!buf_info[type].data)
+		goto fail;
+
+	value = data[1];
+	rect.left_x = value & 0x1fff;
+	rect.top_y = (value >> 16) & 0x1fff;
+
+	value = data[3];
+	rect.right_x = value & 0x1fff;
+	rect.bottom_y = (value >> 16) & 0x1fff;
+
+	if (g2d_is_rect_valid(&rect, &buf_info[type])) {
+		buf_info[type].rect_valid = true;
+		return 0;
+	}
+
+fail:
+	return -EINVAL;
+}
+
 static void g2d_cmdlist_prolog(struct g2d_cmdlist *cmdlist, bool event)
 {
 	cmdlist->last = 0;
