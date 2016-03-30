@@ -1220,6 +1220,29 @@ err:
 	return -EINVAL;
 }
 
+static void g2d_inspect_bitblt_command(unsigned long value, unsigned int *flags)
+{
+	if (value & G2D_BITBLT_MASK_ROP4)
+		*flags |= NODE_BITBLT_MASK_ROP4;
+	else
+		*flags &= ~NODE_BITBLT_MASK_ROP4;
+
+	if (value & G2D_BITBLT_MASK_NORMAL)
+		*flags |= NODE_BITBLT_MASK_NORMAL;
+	else
+		*flags &= ~NODE_BITBLT_MASK_NORMAL;
+
+	if (value & G2D_BITBLT_ENABLE_CW)
+		*flags |= NODE_BITBLT_CLIP_WINDOW;
+	else
+		*flags &= ~NODE_BITBLT_CLIP_WINDOW;
+
+	if (value & G2D_BITBLT_SOLID_FILL)
+		*flags |= NODE_BITBLT_SOLID_FILL;
+	else
+		*flags &= ~NODE_BITBLT_SOLID_FILL;
+}
+
 static int g2d_validate_coords(const unsigned long *data,
 				struct g2d_buf_info *buf_info)
 {
