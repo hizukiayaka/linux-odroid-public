@@ -1372,6 +1372,25 @@ static void g2d_inspect_third_operand(unsigned long value, unsigned int *flags)
 		*flags &= ~NODE_THIRD_OP_MASKED_PAT;
 }
 
+static void g2d_inspect_rop4(unsigned long value, unsigned int *flags)
+{
+	unsigned int rop3;
+
+	/* Check unmasked ROP3 for use of third operand. */
+	rop3 = value & G2D_ROP4_UNMASKED_ROP3;
+	if (rop3 & 0xf0)
+		*flags |= NODE_ROP4_UNMASKED_THIRD_OP;
+	else
+		*flags &= ~NODE_ROP4_UNMASKED_THIRD_OP;
+
+	/* Do the same for masked ROP3. */
+	rop3 = (value & G2D_ROP4_MASKED_ROP3) >> 8;
+	if (rop3 & 0xf0)
+		*flags |= NODE_ROP4_MASKED_THIRD_OP;
+	else
+		*flags &= ~NODE_ROP4_MASKED_THIRD_OP;
+}
+
 static void g2d_cmdlist_prolog(struct g2d_cmdlist *cmdlist, bool event)
 {
 	cmdlist->last = 0;
