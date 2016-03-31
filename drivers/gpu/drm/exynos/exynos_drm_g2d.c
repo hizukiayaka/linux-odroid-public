@@ -1353,6 +1353,25 @@ fail:
 	return -EINVAL;
 }
 
+static void g2d_inspect_third_operand(unsigned long value, unsigned int *flags)
+{
+	unsigned int select;
+
+	/* Check unmasked select for use of pattern. */
+	select = value & G2D_THIRD_OP_MASK_UNMASKED;
+	if (!select)
+		*flags |= NODE_THIRD_OP_UNMASKED_PAT;
+	else
+		*flags &= ~NODE_THIRD_OP_UNMASKED_PAT;
+
+	/* Do the same for masked select. */
+	select = value & G2D_THIRD_OP_MASK_MASKED;
+	if (!value)
+		*flags |= NODE_THIRD_OP_MASKED_PAT;
+	else
+		*flags &= ~NODE_THIRD_OP_MASKED_PAT;
+}
+
 static void g2d_cmdlist_prolog(struct g2d_cmdlist *cmdlist, bool event)
 {
 	cmdlist->last = 0;
