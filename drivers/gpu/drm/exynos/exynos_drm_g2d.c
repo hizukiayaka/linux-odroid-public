@@ -232,6 +232,35 @@ enum g2d_reg_type {
 	MAX_REG_TYPE_NR
 };
 
+enum g2d_cmdlist_node_flags {
+	/*
+	 * Keep track of the source image being read from
+	 * a buffer in memory.
+	 */
+	NODE_SRC_USES_BUFFER		= (1 << 0),
+
+	/*
+	 * Keep track of the third operand register's use of pattern.
+	 */
+	NODE_THIRD_OP_UNMASKED_PAT	= (1 << 1),
+	NODE_THIRD_OP_MASKED_PAT	= (1 << 2),
+
+	/*
+	 * Keep track of the ROP4 register's use of the third operand.
+	 */
+	NODE_ROP4_UNMASKED_THIRD_OP	= (1 << 3),
+	NODE_ROP4_MASKED_THIRD_OP	= (1 << 4),
+
+	/*
+	 * Keep track of the bitblt command register's use of masking,
+	 * clipping window and solid fill.
+	 */
+	NODE_BITBLT_MASK_NORMAL		= (1 << 5),
+	NODE_BITBLT_MASK_ROP4		= (1 << 6),
+	NODE_BITBLT_CLIP_WINDOW		= (1 << 7),
+	NODE_BITBLT_SOLID_FILL		= (1 << 8),
+};
+
 /* cmdlist data structure */
 struct g2d_cmdlist {
 	u32		head;
@@ -300,6 +329,7 @@ struct g2d_cmdlist_node {
 	struct g2d_cmdlist	*cmdlist;
 	dma_addr_t		dma_addr;
 	struct g2d_buf_info	buf_info[MAX_REG_TYPE_NR];
+	unsigned int		flags;
 
 	struct drm_exynos_pending_g2d_event	*event;
 };
