@@ -1295,6 +1295,34 @@ fail:
 	return -EINVAL;
 }
 
+static int g2d_validate_pattern(unsigned long value,
+				struct g2d_buf_info *buf_info)
+{
+	unsigned int width, height;
+	unsigned int last_pos;
+
+	width = value & G2D_PAT_SIZE_MASK;
+	if (width == 0 || width > 8000)
+		goto fail;
+
+	height = (value >> G2D_PAT_HEIGHT_SHIFT) & G2D_PAT_SIZE_MASK;
+	if (height == 0 || height > 8000)
+		goto fail;
+
+	last_pos = (height - 1) * buf_info->stride +
+		width * buf_info->bpp - 1;
+
+	if (last_pos >= buf_info->size)
+		goto fail;
+
+	buf_info->rect_valid = true;
+
+	return 0;
+
+fail:
+	return -EINVAL;
+}
+
 static int g2d_validate_bitblt_start(unsigned long value,
 				const struct g2d_cmdlist_node *node)
 {
