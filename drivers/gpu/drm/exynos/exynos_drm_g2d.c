@@ -1272,6 +1272,67 @@ fail:
 	return -EINVAL;
 }
 
+static int g2d_validate_bitblt_start(unsigned long value,
+				const struct g2d_cmdlist_node *node)
+{
+	bool need_mask, need_pattern;
+
+	if (!(value & G2D_START_BITBLT))
+		goto fail;
+
+	/* We need a valid destination rectangle for _every_ blit operation. */
+	if (!node->buf_info[REG_TYPE_DST].rect_valid)
+		goto fail;
+
+	/* If we're doing a solid fill operation, all other BitBLT parameters are ignored. */
+	if (node->flags & NODE_BITBLT_SOLID_FILL)
+		return 0;
+
+	/* TODO: Clipping window functionality is not implemented yet. */
+	if (node->flags & NODE_BITBLT_CLIP_WINDOW)
+		goto fail;
+
+	/* If the source uses a buffer in memory we need a valid source rectangle. */
+	if ( (node->flags & NODE_SRC_USES_BUFFER) &&
+	    !(node->buf_info[REG_TYPE_SRC].rect_valid))
+		goto fail;
+
+	need_mask = false;
+	need_pattern = false;
+
+	/*
+	 * If the unmasked ROP4 is using the third operand register, and
+	 * the third operand uses the pattern we need a valid pattern rectangle.
+	 */
+	if ((node->flags & NODE_ROP4_UNMASKED_THIRD_OP) &&
+	    (node->flags & NODE_THIRD_OP_UNMASKED_PAT))
+		need_pattern = true;
+
+	/* If the bitblt command uses a mask we need a valid mask rectangle. */
+	if (node->flags & NODE_BITBLT_MASK_NORMAL)
+		need_mask = true;
+
+	/* Check for third operand / pattern in masked ROP4s. */
+	if (node->flags & NODE_BITBLT_MASK_ROP4) {
+		need_mask = true;
+
+		if ((node->flags & NODE_ROP4_MASKED_THIRD_OP) &&
+		    (node->flags & NODE_THIRD_OP_MASKED_PAT))
+			need_pattern = true;
+	}
+
+	if (need_mask && !(node->buf_info[REG_TYPE_MSK].rect_valid))
+		goto fail;
+
+	if (need_pattern && !(node->buf_info[REG_TYPE_PAT].rect_valid))
+		goto fail;
+
+	return 0;
+
+fail:
+	return -EINVAL;
+}
+
 static void g2d_cmdlist_prolog(struct g2d_cmdlist *cmdlist, bool event)
 {
 	cmdlist->last = 0;
