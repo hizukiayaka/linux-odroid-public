@@ -1323,6 +1323,19 @@ fail:
 	return -EINVAL;
 }
 
+/*
+ * While a blitting operation always needs a valid destination memory buffer
+ * set, the operation can work without any source memory buffer.
+ * Check if this is the case here.
+ */
+static void g2d_inspect_src_select(unsigned long value, unsigned int *flags)
+{
+	if (!(value & 0x3))
+		*flags |= NODE_SRC_USES_BUFFER;
+	else
+		*flags &= ~NODE_SRC_USES_BUFFER;
+}
+
 static int g2d_validate_bitblt_start(unsigned long value,
 				const struct g2d_cmdlist_node *node)
 {
