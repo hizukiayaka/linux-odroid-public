@@ -912,6 +912,18 @@ static unsigned long g2d_get_buf_bpp(unsigned int format)
 	return bpp;
 }
 
+static bool g2d_is_ycbcr_fmt(unsigned int format)
+{
+	switch (format) {
+	case G2D_FMT_YCbCr444:
+	case G2D_FMT_YCbCr422:
+	case G2D_FMT_YCbCr420:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static bool g2d_is_rect_valid(const struct g2d_rect *rect,
 				const struct g2d_buf_info *buf_info)
 {
