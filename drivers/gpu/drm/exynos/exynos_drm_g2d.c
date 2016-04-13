@@ -923,6 +923,17 @@ static bool g2d_is_ycbcr_fmt(unsigned int format)
 	}
 }
 
+static bool g2d_is_plane2_type(unsigned int reg)
+{
+	switch (reg) {
+	case REG_TYPE_SRC_PLANE2:
+	case REG_TYPE_DST_PLANE2:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static bool g2d_is_rect_valid(const struct g2d_rect *rect,
 				const struct g2d_buf_info *buf_info)
 {
