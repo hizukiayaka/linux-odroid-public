@@ -216,11 +216,6 @@ enum g2d_color_format {
 /* maximum buffer pool size of userptr is 64MB as default */
 #define G2D_MAX_POOL		(64 * 1024 * 1024)
 
-enum {
-	BUF_TYPE_GEM = 1,
-	BUF_TYPE_USERPTR,
-};
-
 enum g2d_reg_type {
 	REG_TYPE_NONE = -1,
 	REG_TYPE_SRC,
