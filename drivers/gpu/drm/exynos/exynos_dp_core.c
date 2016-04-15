@@ -1054,7 +1054,6 @@ static int exynos_dp_bridge_attach(struct drm_bridge *bridge)
 static void exynos_dp_bridge_enable(struct drm_bridge *bridge)
 {
 	struct exynos_dp_device *dp = bridge->driver_private;
-	struct exynos_drm_crtc *crtc = dp_to_crtc(dp);
 
 	if (dp->dpms_mode == DRM_MODE_DPMS_ON)
 		return;
@@ -1068,8 +1067,7 @@ static void exynos_dp_bridge_enable(struct drm_bridge *bridge)
 		}
 	}
 
-	if (crtc->ops->clock_enable)
-		crtc->ops->clock_enable(dp_to_crtc(dp), true);
+	exynos_drm_pipe_clk_enable(dp_to_crtc(dp), true);
 
 	phy_power_on(dp->phy);
 	exynos_dp_init_dp(dp);
@@ -1082,7 +1080,6 @@ static void exynos_dp_bridge_enable(struct drm_bridge *bridge)
 static void exynos_dp_bridge_disable(struct drm_bridge *bridge)
 {
 	struct exynos_dp_device *dp = bridge->driver_private;
-	struct exynos_drm_crtc *crtc = dp_to_crtc(dp);
 
 	if (dp->dpms_mode != DRM_MODE_DPMS_ON)
 		return;
@@ -1098,8 +1095,7 @@ static void exynos_dp_bridge_disable(struct drm_bridge *bridge)
 	flush_work(&dp->hotplug_work);
 	phy_power_off(dp->phy);
 
-	if (crtc->ops->clock_enable)
-		crtc->ops->clock_enable(dp_to_crtc(dp), false);
+	exynos_drm_pipe_clk_enable(dp_to_crtc(dp), false);
 
 	if (dp->panel) {
 		if (drm_panel_unprepare(dp->panel))
