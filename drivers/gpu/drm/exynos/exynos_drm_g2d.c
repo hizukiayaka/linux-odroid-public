@@ -202,6 +202,8 @@ enum g2d_color_format {
 	G2D_FMT_YCbCr420,
 	G2D_FMT_A8,
 	G2D_FMT_L8,
+	G2D_FMT_MAX,
+	G2D_FMT_MASK = 0xF,
 };
 
 /* buffer valid length */
@@ -1297,7 +1299,19 @@ static int g2d_validate_base_cmds(struct device *dev,
 			reg_type = g2d_get_reg_type(reg_offset);
 			buf_info = &node->buf_info[reg_type];
 
-			buf_info->format = cmdlist->data[index + 1] & 0xf;
+			buf_info->format = cmdlist->data[index + 1] & G2D_FMT_MASK;
+
+			/*
+			 * The color type part of the format field is 4 bits wide, allowing for
+			 * a total of 16 entries. But apparantly not all entries are valid.
+			 * Some sources however suggest that b1101 and b1110 map to a 1-bit and
+			 * a 4-bit format format respectively, but tests show that the engine
+			 * just hangs when using these.
+			 * Make sure that we only pass valid entries to the engine.
+			 */
+			if (buf_info->format >= G2D_FMT_MAX)
+				goto err;
+
 			buf_info->bpp = g2d_get_buf_bpp(buf_info->format);
 			break;
 
