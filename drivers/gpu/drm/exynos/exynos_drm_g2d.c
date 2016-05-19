@@ -366,6 +366,7 @@ struct g2d_data {
 	struct kmem_cache		*runqueue_slab;
 
 	unsigned long			current_pool;
+	struct mutex			userptr_mutex;
 };
 
 static void g2d_set_max_burst_length(struct g2d_data *g2d, unsigned len)
@@ -616,7 +617,7 @@ out:
 	if (unlikely(!g2d))
 		return -EFAULT;
 
-	list_del_init(&userptr->list);
+	list_del(&userptr->list);
 
 	sgt = userptr->sgt;
 	vec = userptr->vec;
@@ -865,11 +866,13 @@ static void g2d_userptr_free_all(struct drm_device *drm_dev,
 	struct exynos_drm_g2d_private *g2d_priv = file_priv->g2d_priv;
 	struct g2d_cmdlist_userptr *userptr, *n;
 
+	mutex_lock(&g2d->userptr_mutex);
+
 	list_for_each_entry_safe(userptr, n, &g2d_priv->userptr_list, list) {
 		g2d_userptr_unregister(drm_dev, userptr, true, filp);
 	}
 
-	g2d->current_pool = 0;
+	mutex_unlock(&g2d->userptr_mutex);
 }
 
 static enum g2d_reg_type g2d_get_reg_type(int reg_offset)
@@ -1955,27 +1958,53 @@ int exynos_g2d_userptr_ioctl(struct drm_device *drm_dev, void *data,
 {
 	struct drm_exynos_file_private *file_priv = file->driver_priv;
 	struct exynos_drm_g2d_private *g2d_priv = file_priv->g2d_priv;
+	struct device *dev;
+	struct g2d_data *g2d;
 
 	struct drm_exynos_g2d_userptr_op *userptr_op = data;
 	struct g2d_cmdlist_userptr *userptr;
+	int ret;
+
+	if (unlikely(!g2d_priv))
+		return -ENODEV;
+
+	dev = g2d_priv->dev;
+	if (unlikely(!dev))
+		return -ENODEV;
+
+	g2d = dev_get_drvdata(dev);
+	if (unlikely(!g2d))
+		return -EFAULT;
+
+	mutex_lock(&g2d->userptr_mutex);
 
 	switch (userptr_op->operation) {
 	case G2D_USERPTR_REGISTER:
-		return g2d_userptr_register(drm_dev, userptr_op->user_addr,
+		ret = g2d_userptr_register(drm_dev, userptr_op->user_addr,
 			userptr_op->size, userptr_op->flags, file);
+		break;
+
 	case G2D_USERPTR_UNREGISTER:
 		userptr = g2d_userptr_lookup(g2d_priv, userptr_op->user_addr);
-		if (!userptr) {
+		if (userptr) {
+			ret = g2d_userptr_unregister(drm_dev, userptr, false, file);
+		} else {
 			DRM_ERROR("userptr %llu not registered.\n", userptr_op->user_addr);
-			return -EINVAL;
+			ret = -EINVAL;
 		}
+		break;
 
-		return g2d_userptr_unregister(drm_dev, userptr, false, file);
 	case G2D_USERPTR_CHECK_IDLE:
-		return g2d_userptr_check_idle(g2d_priv, userptr_op->user_addr);
+		ret = g2d_userptr_check_idle(g2d_priv, userptr_op->user_addr);
+		break;
+
+	default:
+		ret = -EFAULT;
+		break;
 	}
 
-	return -EFAULT;
+	mutex_unlock(&g2d->userptr_mutex);
+	return ret;
 }
 
 static int g2d_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
@@ -2062,6 +2091,7 @@ static void g2d_close(struct drm_device *drm_dev, struct device *dev,
 	g2d_userptr_free_all(drm_dev, g2d, file);
 
 	kfree(file_priv->g2d_priv);
+	file_priv->g2d_priv = NULL;
 }
 
 static int g2d_probe(struct platform_device *pdev)
@@ -2096,6 +2126,7 @@ static int g2d_probe(struct platform_device *pdev)
 
 	mutex_init(&g2d->cmdlist_mutex);
 	mutex_init(&g2d->runqueue_mutex);
+	mutex_init(&g2d->userptr_mutex);
 
 	g2d->gate_clk = devm_clk_get(dev, "fimg2d");
 	if (IS_ERR(g2d->gate_clk)) {
