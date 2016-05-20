@@ -605,7 +605,7 @@ static int g2d_userptr_unregister(struct drm_device *drm_dev,
 		goto out;
 
 	if (atomic_read(&userptr->refcount) > 0) {
-		DRM_ERROR("userptr %llu still in use.", userptr->user_addr);
+		DRM_ERROR("userptr %llx still in use.", userptr->user_addr);
 		return -EBUSY;
 	}
 
@@ -678,7 +678,7 @@ static int g2d_userptr_register(struct drm_device *drm_dev,
 
 	userptr = g2d_userptr_lookup(g2d_priv, user_addr);
 	if (userptr) {
-		DRM_ERROR("userptr %llu already registered.\n", user_addr);
+		DRM_ERROR("userptr %llx already registered.\n", user_addr);
 		return -EEXIST;
 	}
 
@@ -1989,7 +1989,7 @@ int exynos_g2d_userptr_ioctl(struct drm_device *drm_dev, void *data,
 		if (userptr) {
 			ret = g2d_userptr_unregister(drm_dev, userptr, false, file);
 		} else {
-			DRM_ERROR("userptr %llu not registered.\n", userptr_op->user_addr);
+			DRM_ERROR("userptr %llx not registered.\n", userptr_op->user_addr);
 			ret = -EINVAL;
 		}
 		break;
