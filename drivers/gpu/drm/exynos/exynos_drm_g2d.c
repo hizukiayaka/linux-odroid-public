@@ -574,6 +574,10 @@ static void g2d_userptr_put_dma_addr(struct drm_device *drm_dev,
 			userptr->direction);
 }
 
+/*
+ * Lookup an userptr via its userspace address.
+ * Must be called while holding the userptr mutex.
+ */
 static struct g2d_cmdlist_userptr *g2d_userptr_lookup(
 	const struct exynos_drm_g2d_private *g2d_priv,
 	uint64_t user_addr)
@@ -588,6 +592,10 @@ static struct g2d_cmdlist_userptr *g2d_userptr_lookup(
 	return NULL;
 }
 
+/*
+ * Unregister an existing userptr.
+ * Must be called while holding the userptr mutex.
+ */
 static int g2d_userptr_unregister(struct drm_device *drm_dev,
 					struct g2d_cmdlist_userptr *userptr,
 					bool force, struct drm_file *filp)
@@ -655,6 +663,10 @@ out:
 	return 0;
 }
 
+/*
+ * Register an new userptr.
+ * Must be called while holding the userptr mutex.
+ */
 static int g2d_userptr_register(struct drm_device *drm_dev,
 					uint64_t user_addr, uint64_t size,
 					uint32_t flags, struct drm_file *filp)
