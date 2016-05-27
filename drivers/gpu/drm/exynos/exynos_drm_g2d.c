@@ -193,7 +193,11 @@ enum g2d_hw_registers {
 #define G2D_THIRD_OP_MASK_UNMASKED	0x0003
 #define G2D_THIRD_OP_MASK_MASKED	0x0030
 
-/* buffer color format */
+/*
+ * buffer color format
+ * - for source and destination all formats are valid
+ * - for pattern all but the YCbCr/alpha/luminance ones are valid
+ */
 enum g2d_color_format {
 	G2D_FMT_XRGB8888,
 	G2D_FMT_ARGB8888,
@@ -210,6 +214,19 @@ enum g2d_color_format {
 	G2D_FMT_L8,
 	G2D_FMT_MAX,
 	G2D_FMT_MASK = 0xF,
+};
+
+enum g2d_mask_mode {
+	G2D_MSK_1BIT,
+	G2D_MSK_4BIT,
+	G2D_MSK_8BIT,
+	G2D_MSK_16BIT_565,
+	G2D_MSK_16BIT_1555,
+	G2D_MSK_16BIT_4444,
+	G2D_MSK_32BIT_8888,
+	G2D_MSK_4BIT_WINCE_AA_FONT,
+	G2D_MSK_MAX,
+	G2D_MSK_MASK = 0xF,
 };
 
 /* buffer valid length */
@@ -977,6 +994,37 @@ static unsigned long g2d_get_buf_bpp(unsigned int format)
 	return bpp;
 }
 
+static unsigned long g2d_get_msk_bpp(unsigned int format)
+{
+	unsigned long bpp;
+
+	switch (format) {
+	case G2D_MSK_1BIT:
+	case G2D_MSK_4BIT:
+	case G2D_MSK_4BIT_WINCE_AA_FONT:
+		/*
+		 * TODO: Return the correct value here (after we convert
+		 * the code to use bits per pixel).
+		 */
+		bpp = 1;
+		break;
+	case G2D_MSK_8BIT:
+		bpp = 1;
+		break;
+	case G2D_MSK_16BIT_565:
+	case G2D_MSK_16BIT_1555:
+	case G2D_MSK_16BIT_4444:
+		bpp = 2;
+		break;
+	case G2D_MSK_32BIT_8888:
+	default:
+		bpp = 4;
+		break;
+	}
+
+	return bpp;
+}
+
 static bool g2d_is_ycbcr_fmt(unsigned int format)
 {
 	switch (format) {
@@ -1352,13 +1400,22 @@ static int g2d_validate_base_cmds(struct device *dev,
 			buf_info->bpp = g2d_get_buf_bpp(buf_info->format);
 			break;
 
+		case G2D_MSK_MODE:
+			buf_info = &node->buf_info[REG_TYPE_MSK];
+
+			buf_info->format = cmdlist->data[index + 1] & G2D_MSK_MASK;
+
+			if (buf_info->format >= G2D_MSK_MAX)
+				goto err;
+
+			buf_info->bpp = g2d_get_msk_bpp(buf_info->format);
+			break;
+
 		/*
 		 * TODO:
 		 *  - pattern color is limited to a subset of src/dst color mode
-		 *  - mask mode is different from color mode altogether
 		 */
 		case G2D_PAT_COLOR_MODE:
-		case G2D_MSK_MODE:
 			goto err;
 			break;
 
