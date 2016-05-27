@@ -1924,6 +1924,24 @@ int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
 	if (unlikely(!g2d))
 		return -EFAULT;
 
+	if (req->flags & G2D_EXEC_RESET_HW)
+		writel_relaxed(G2D_R | G2D_SFRCLEAR, g2d->regs + G2D_SOFT_RESET);
+
+	if (req->flags & G2D_EXEC_CLEAR_CMDLISTS) {
+		struct g2d_cmdlist_node *node, *n;
+
+		mutex_lock(&g2d->cmdlist_mutex);
+		list_for_each_entry_safe(node, n, &g2d_priv->inuse_cmdlist, list) {
+			g2d_unmap_cmdlist_buffers(g2d, node, file);
+
+			list_move_tail(&node->list, &g2d->free_cmdlist);
+		}
+		mutex_unlock(&g2d->cmdlist_mutex);
+
+		/* After clearing the commandlists there is nothing else to do. */
+		goto out;
+	}
+
 	runqueue_node = kmem_cache_alloc(g2d->runqueue_slab, GFP_KERNEL);
 	if (unlikely(!runqueue_node)) {
 		dev_err(dev, "failed to allocate memory\n");
@@ -1934,7 +1952,10 @@ int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
 	INIT_LIST_HEAD(run_cmdlist);
 	INIT_LIST_HEAD(event_list);
 	init_completion(&runqueue_node->complete);
-	runqueue_node->async = req->async;
+	runqueue_node->async = 0;
+
+	if (req->flags & G2D_EXEC_ASYNC)
+		runqueue_node->async = 1;
 
 	list_splice_init(&g2d_priv->inuse_cmdlist, run_cmdlist);
 	list_splice_init(&g2d_priv->event_list, event_list);
