@@ -138,6 +138,15 @@ enum e_drm_exynos_g2d_userptr_flags {
 		G2D_USERPTR_FLAG_READ | G2D_USERPTR_FLAG_WRITE
 };
 
+enum e_drm_exynos_g2d_exec_flags {
+	/* Execute commandlists asynchronously. */
+	G2D_EXEC_ASYNC			= (1 << 0),
+	/* Issue full reset of the G2D hardware. */
+	G2D_EXEC_RESET_HW		= (1 << 1),
+	/* Clear all commandlists that userspace has passed to the kernel driver. */
+	G2D_EXEC_CLEAR_CMDLISTS		= (1 << 2),
+};
+
 /*
  * Base commands:
  *
@@ -197,7 +206,7 @@ struct drm_exynos_g2d_set_cmdlist2 {
 };
 
 struct drm_exynos_g2d_exec {
-	__u64					async;
+	__u64					flags;
 };
 
 /**
