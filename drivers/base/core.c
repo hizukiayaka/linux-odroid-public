@@ -119,6 +119,9 @@ struct devlink *device_link_add(struct device *consumer,
 	get_device(consumer);
 	link->consumer = consumer;
 	INIT_LIST_HEAD(&link->c_node);
+	if (flags & DEVICE_LINK_PM_RUNTIME)
+		pm_runtime_new_link(consumer);
+
 	link->flags = flags;
 	link->status = (flags & DEVICE_LINK_PROBE_TIME) ?
 			DEVICE_LINK_CONSUMER_PROBE : DEVICE_LINK_DORMANT;
@@ -160,6 +163,9 @@ static void devlink_del(struct devlink *link)
 {
 	dev_info(link->consumer, "Dropping the link to %s\n",
 		 dev_name(link->supplier));
+
+	if (link->flags & DEVICE_LINK_PM_RUNTIME)
+		pm_runtime_drop_link(link->consumer);
 
 	list_del_rcu(&link->s_node);
 	list_del_rcu(&link->c_node);

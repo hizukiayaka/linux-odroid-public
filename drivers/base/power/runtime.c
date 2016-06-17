@@ -270,6 +270,7 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 {
 	struct devlink *link;
 	int retval, idx;
+	bool use_links = dev->power.links_count > 0;
 
 	if (dev->power.irq_safe) {
 		spin_unlock(&dev->power.lock);
@@ -283,7 +284,7 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 		 * routine returns, so it is safe to read the status outside of
 		 * the lock.
 		 */
-		if (dev->power.runtime_status == RPM_RESUMING) {
+		if (use_links && dev->power.runtime_status == RPM_RESUMING) {
 			idx = device_links_read_lock();
 
 			list_for_each_entry_rcu(link, &dev->consumer_links, c_node)
@@ -314,8 +315,9 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 		 *
 		 * Do that if resume fails too.
 		 */
-		if ((dev->power.runtime_status == RPM_SUSPENDING && !retval)
-		    || (dev->power.runtime_status == RPM_RESUMING && retval)) {
+		if (use_links
+		    && ((dev->power.runtime_status == RPM_SUSPENDING && !retval)
+		    || (dev->power.runtime_status == RPM_RESUMING && retval))) {
 			idx = device_links_read_lock();
 
  fail:
@@ -1523,6 +1525,21 @@ void pm_runtime_clean_up_links(struct device *dev)
 		}
 
 	device_links_read_unlock(idx);
+}
+
+void pm_runtime_new_link(struct device *dev)
+{
+	spin_lock_irq(&dev->power.lock);
+	dev->power.links_count++;
+	spin_unlock_irq(&dev->power.lock);
+}
+
+void pm_runtime_drop_link(struct device *dev)
+{
+	spin_lock_irq(&dev->power.lock);
+	WARN_ON(dev->power.links_count == 0);
+	dev->power.links_count--;
+	spin_unlock_irq(&dev->power.lock);
 }
 
 /**
