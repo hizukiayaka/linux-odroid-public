@@ -163,12 +163,12 @@ void device_link_del(struct devlink *link)
 }
 EXPORT_SYMBOL_GPL(device_link_del);
 
-static int device_links_read_lock(void)
+int device_links_read_lock(void)
 {
 	return srcu_read_lock(&device_links_srcu);
 }
 
-static void device_links_read_unlock(int idx)
+void device_links_read_unlock(int idx)
 {
 	return srcu_read_unlock(&device_links_srcu, idx);
 }
