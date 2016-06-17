@@ -261,6 +261,26 @@ static int rpm_check_suspend_allowed(struct device *dev)
 }
 
 /**
+ * __pm_runtime_force_resume - force resume of the device
+ * @dev: Device to resume
+ *
+ * This function works like __pm_runtime_resume(dev, RPM_GET_PUT), but
+ * also handles devices with runtime PM disabled. This allows to properly
+ * control all devices during preparation for system PM transition.
+ */
+static int __pm_runtime_force_resume(struct device *dev)
+{
+	if (!dev->power.disable_depth)
+		return pm_runtime_get_sync(dev);
+
+	if (dev->power.runtime_status != RPM_ACTIVE ||
+	    atomic_inc_not_zero(&dev->power.usage_count) == 0)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
  * __rpm_callback - Run a given runtime PM callback for a given device.
  * @cb: Runtime PM callback to run.
  * @dev: Device to run the callback for.
@@ -291,7 +311,7 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 				if ((link->flags & DEVICE_LINK_PM_RUNTIME)
 				    && link->status != DEVICE_LINK_SUPPLIER_UNBIND
 				    && !link->rpm_active) {
-					retval = pm_runtime_get_sync(link->supplier);
+					retval = __pm_runtime_force_resume(link->supplier);
 					if (retval < 0) {
 						pm_runtime_put_noidle(link->supplier);
 						goto fail;
