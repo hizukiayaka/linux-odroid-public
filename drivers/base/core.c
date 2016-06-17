@@ -88,6 +88,11 @@ struct devlink *device_link_add(struct device *consumer,
 	if (!consumer || !supplier || !flags)
 		return NULL;
 
+#define RPM_ACTIVE_FLAGS (DEVICE_LINK_PM_RUNTIME | DEVICE_LINK_PROBE_TIME)
+	if ((flags & DEVICE_LINK_RPM_ACTIVE)
+	    && (flags & RPM_ACTIVE_FLAGS) != RPM_ACTIVE_FLAGS)
+		return NULL;
+
 	mutex_lock(&device_links_lock);
 
 	list_for_each_entry(link, &supplier->supplier_links, s_node)
@@ -98,6 +103,16 @@ struct devlink *device_link_add(struct device *consumer,
 	if (!link)
 		goto out;
 
+	if (flags & DEVICE_LINK_RPM_ACTIVE) {
+		if (pm_runtime_get_sync(supplier) < 0) {
+			pm_runtime_put_noidle(supplier);
+			kfree(link);
+			goto out;
+		}
+		link->rpm_active = true;
+	} else {
+		link->rpm_active = false;
+	}
 	get_device(supplier);
 	link->supplier = supplier;
 	INIT_LIST_HEAD(&link->s_node);

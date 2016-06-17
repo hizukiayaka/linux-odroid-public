@@ -12,6 +12,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/pm_wakeirq.h>
 #include <trace/events/rpm.h>
+
+#include "../base.h"
 #include "power.h"
 
 typedef int (*pm_callback_t)(struct device *);
@@ -266,19 +268,69 @@ static int rpm_check_suspend_allowed(struct device *dev)
 static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 	__releases(&dev->power.lock) __acquires(&dev->power.lock)
 {
-	int retval;
+	struct devlink *link;
+	int retval, idx;
 
-	if (dev->power.irq_safe)
+	if (dev->power.irq_safe) {
 		spin_unlock(&dev->power.lock);
-	else
+	} else {
 		spin_unlock_irq(&dev->power.lock);
+
+		/*
+		 * Resume suppliers if necessary.
+		 *
+		 * The device's runtime PM status cannot change until this
+		 * routine returns, so it is safe to read the status outside of
+		 * the lock.
+		 */
+		if (dev->power.runtime_status == RPM_RESUMING) {
+			idx = device_links_read_lock();
+
+			list_for_each_entry_rcu(link, &dev->consumer_links, c_node)
+				if ((link->flags & DEVICE_LINK_PM_RUNTIME)
+				    && link->status != DEVICE_LINK_SUPPLIER_UNBIND
+				    && !link->rpm_active) {
+					retval = pm_runtime_get_sync(link->supplier);
+					if (retval < 0) {
+						pm_runtime_put_noidle(link->supplier);
+						goto fail;
+					}
+					link->rpm_active = true;
+				}
+
+			device_links_read_unlock(idx);
+		}
+	}
 
 	retval = cb(dev);
 
-	if (dev->power.irq_safe)
+	if (dev->power.irq_safe) {
 		spin_lock(&dev->power.lock);
-	else
+	} else {
+		/*
+		 * If the device is suspending and the callback has returned
+		 * success, drop the usage counters of the suppliers that have
+		 * been reference counted on its resume.
+		 *
+		 * Do that if resume fails too.
+		 */
+		if ((dev->power.runtime_status == RPM_SUSPENDING && !retval)
+		    || (dev->power.runtime_status == RPM_RESUMING && retval)) {
+			idx = device_links_read_lock();
+
+ fail:
+			list_for_each_entry_rcu(link, &dev->consumer_links, c_node)
+				if (link->status != DEVICE_LINK_SUPPLIER_UNBIND
+				    && link->rpm_active) {
+					pm_runtime_put(link->supplier);
+					link->rpm_active = false;
+				}
+
+			device_links_read_unlock(idx);
+		}
+
 		spin_lock_irq(&dev->power.lock);
+	}
 
 	return retval;
 }
@@ -1440,6 +1492,37 @@ void pm_runtime_remove(struct device *dev)
 {
 	__pm_runtime_disable(dev, false);
 	pm_runtime_reinit(dev);
+}
+
+/**
+ * pm_runtime_clean_up_links - Prepare links to consumers for driver removal.
+ * @dev: Device whose driver is going to be removed.
+ *
+ * Check links from this device to any consumers and if any of them have active
+ * runtime PM references to the device, drop the usage counter of the device
+ * (once per link).
+ *
+ * Since the device is guaranteed to be runtime-active at the point this is
+ * called, nothing else needs to be done here.
+ *
+ * Moreover, this is called after device_links_busy() has returned 'false', so
+ * the status of each link is guaranteed to be DEVICE_LINK_SUPPLIER_UNBIND and
+ * therefore rpm_active can't be manipulated concurrently.
+ */
+void pm_runtime_clean_up_links(struct device *dev)
+{
+	struct devlink *link;
+	int idx;
+
+	idx = device_links_read_lock();
+
+	list_for_each_entry_rcu(link, &dev->supplier_links, s_node)
+		if (link->rpm_active) {
+			pm_runtime_put_noidle(dev);
+			link->rpm_active = false;
+		}
+
+	device_links_read_unlock(idx);
 }
 
 /**
