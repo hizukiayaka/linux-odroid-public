@@ -125,7 +125,9 @@ struct devlink *device_link_add(struct device *consumer,
 
 	link->flags = flags;
 	link->status = (flags & DEVICE_LINK_PROBE_TIME) ?
-			DEVICE_LINK_CONSUMER_PROBE : DEVICE_LINK_DORMANT;
+			DEVICE_LINK_CONSUMER_PROBE :
+			(supplier->driver ? DEVICE_LINK_AVAILABLE :
+			 DEVICE_LINK_DORMANT);
 	spin_lock_init(&link->lock);
 
 	/*
