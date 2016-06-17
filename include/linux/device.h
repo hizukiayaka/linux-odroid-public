@@ -706,6 +706,34 @@ struct device_dma_parameters {
 	unsigned long segment_boundary_mask;
 };
 
+enum devlink_status {
+	DEVICE_LINK_DORMANT = 0,	/* Link not in use. */
+	DEVICE_LINK_AVAILABLE,		/* Supplier driver is present. */
+	DEVICE_LINK_ACTIVE,		/* Consumer driver is present too. */
+	DEVICE_LINK_CONSUMER_PROBE,	/* Consumer is probing. */
+	DEVICE_LINK_SUPPLIER_UNBIND,	/* Supplier is unbinding. */
+};
+
+/*
+ * Device link flags.
+ *
+ * PERSISTENT: Do not delete the link on consumer device driver unbind.
+ * PROBE_TIME: Assume supplier device functional when creating the link.
+ */
+#define DEVICE_LINK_PERSISTENT	(1 << 0)
+#define DEVICE_LINK_PROBE_TIME	(1 << 1)
+
+struct devlink {
+	struct device *supplier;
+	struct list_head s_node;
+	struct device *consumer;
+	struct list_head c_node;
+	enum devlink_status status;
+	u32 flags;
+	spinlock_t lock;
+	struct rcu_head rcu_head;
+};
+
 /**
  * struct device - The basic device structure
  * @parent:	The device's "parent" device, the device to which it is attached.
@@ -731,6 +759,8 @@ struct device_dma_parameters {
  * 		on.  This shrinks the "Board Support Packages" (BSPs) and
  * 		minimizes board-specific #ifdefs in drivers.
  * @driver_data: Private pointer for driver specific info.
+ * @supplier_links: Links to consumer devices.
+ * @consumer_links: Links to supplier devices.
  * @power:	For device power management.
  * 		See Documentation/power/devices.txt for details.
  * @pm_domain:	Provide callbacks that are executed during system suspend,
@@ -797,6 +827,8 @@ struct device {
 					   core doesn't touch it */
 	void		*driver_data;	/* Driver data, set and get with
 					   dev_set/get_drvdata */
+	struct list_head	supplier_links;
+	struct list_head	consumer_links;
 	struct dev_pm_info	power;
 	struct dev_pm_domain	*pm_domain;
 
@@ -1113,6 +1145,10 @@ extern void device_shutdown(void);
 /* debugging and troubleshooting/diagnostic helpers. */
 extern const char *dev_driver_string(const struct device *dev);
 
+/* Device links interface. */
+struct devlink *device_link_add(struct device *consumer,
+				struct device *supplier, u32 flags);
+void device_link_del(struct devlink *link);
 
 #ifdef CONFIG_PRINTK
 
