@@ -57,7 +57,8 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
 	device_pm_move_last(dev);
 	device_for_each_child(dev, NULL, device_reorder_to_tail);
 	list_for_each_entry(link, &dev->consumer_links, c_node)
-		device_reorder_to_tail(link->consumer, NULL);
+		if (link->consumer != dev)
+			device_reorder_to_tail(link->consumer, NULL);
 
 	return 0;
 }
