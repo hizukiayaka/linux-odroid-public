@@ -564,6 +564,8 @@
 				regulator-min-microvolt = <950000>;
 				regulator-max-microvolt = <1150000>;
 				regulator-microvolt-offset = <50000>;
+				regulator-boot-on;
+				regulator-ramp-delay = <12500>;
 				BUCK4-supply = <&reg_sysvdd>;
 			};
 
