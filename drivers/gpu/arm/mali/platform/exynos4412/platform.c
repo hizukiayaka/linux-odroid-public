@@ -24,6 +24,7 @@
 #include <linux/mali/mali_utgard.h>
 #include <linux/dma-contiguous.h>
 #include <linux/cma.h>
+#include <linux/delay.h>
 
 static struct clk *sclk_g3d_clock = NULL;
 static struct clk *g3d_clock = NULL;
@@ -117,6 +118,23 @@ static int exynos4412_set_voltage(int min_uV, int max_uV)
 	return 0;
 }
 
+static int exynos4412_regulator_reset(struct platform_device *device)
+{
+	if (regulator_disable(g3d_regulator))
+		goto err;
+
+	usleep_range(4000, 10000);
+
+	if (regulator_enable(g3d_regulator))
+		goto err;
+
+	return 0;
+
+err:
+	MALI_PRINT_ERROR(("Mali platform: failed to reset g3d regulator\n"));
+	return -EFAULT;
+}
+
 static int exynos4412_regulator_enable(struct platform_device *device)
 {
 	/*
@@ -166,6 +184,7 @@ static void exynos4412_regulator_disable(void)
 	g3d_regulator = NULL;
 }
 #else
+static int exynos4412_regulator_reset(struct platform_device *device) { return 0; }
 static int exynos4412_regulator_enable(struct platform_device *device) { return 0; }
 static void exynos4412_regulator_disable() {}
 #endif
@@ -180,6 +199,10 @@ int mali_platform_device_init(struct platform_device *device)
 	ret = exynos4412_regulator_enable(device);
 	if (ret < 0)
 		goto fail_regulator;
+
+	ret = exynos4412_regulator_reset(device);
+	if (ret < 0)
+		goto fail_reset;
 
 	ret = exynos4412_clk_enable(device);
 	if (ret < 0)
@@ -214,6 +237,7 @@ int mali_platform_device_init(struct platform_device *device)
 fail_platform_data:
 	exynos4412_clk_disable();
 
+fail_reset:
 fail_clk:
 	exynos4412_regulator_disable();
 
