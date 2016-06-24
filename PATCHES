@@ -6,3 +6,4 @@
 [PATCH] gpu/mali: integration of r5p0 for Exynos4412/Mali-400MP4
 [PATCH v5 0/5] drm/exynos: introduce generic zpos and blending properties
 [PATCH 00/25] Exynos DRM: new life of IPP (Image Post Processing) subsystem
+[PATCH 0/3] Exynos IOMMU: improve clock management
